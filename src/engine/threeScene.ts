@@ -224,7 +224,90 @@ export class ThreeSceneManager {
     this.startLoop();
   }
 
+  private createProceduralTexture(type: 'asphalt' | 'brick' | 'roof' | 'concrete' | 'windowGrid'): THREE.CanvasTexture {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      if (type === 'asphalt') {
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(0, 0, 256, 256);
+        for (let i = 0; i < 4000; i++) {
+          const x = Math.random() * 256;
+          const y = Math.random() * 256;
+          ctx.fillStyle = Math.random() > 0.5 ? '#1e293b' : '#94a3b8';
+          ctx.fillRect(x, y, 1.5, 1.5);
+        }
+      } else if (type === 'brick') {
+        ctx.fillStyle = '#b45309';
+        ctx.fillRect(0, 0, 256, 256);
+        ctx.strokeStyle = '#78350f';
+        ctx.lineWidth = 3;
+        for (let y = 0; y <= 256; y += 16) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(256, y);
+          ctx.stroke();
+        }
+        for (let y = 0; y < 256; y += 16) {
+          const offset = (y / 16) % 2 === 0 ? 0 : 16;
+          for (let x = offset; x <= 256; x += 32) {
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x, y + 16);
+            ctx.stroke();
+          }
+        }
+      } else if (type === 'roof') {
+        ctx.fillStyle = '#78716c';
+        ctx.fillRect(0, 0, 256, 256);
+        ctx.fillStyle = '#292524';
+        for (let x = 0; x < 256; x += 12) {
+          ctx.fillRect(x, 0, 5, 256);
+        }
+      } else if (type === 'concrete') {
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillRect(0, 0, 256, 256);
+        for (let i = 0; i < 2500; i++) {
+          const x = Math.random() * 256;
+          const y = Math.random() * 256;
+          ctx.fillStyle = Math.random() > 0.5 ? '#94a3b8' : '#f1f5f9';
+          ctx.fillRect(x, y, 2, 2);
+        }
+      } else if (type === 'windowGrid') {
+        ctx.fillStyle = '#312e81';
+        ctx.fillRect(0, 0, 256, 256);
+        ctx.strokeStyle = '#818cf8';
+        ctx.lineWidth = 3;
+        for (let x = 32; x < 256; x += 32) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, 256);
+          ctx.stroke();
+        }
+        for (let y = 32; y < 256; y += 32) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(256, y);
+          ctx.stroke();
+        }
+      }
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(3, 3);
+    return texture;
+  }
+
   private initSharedResources() {
+    const asphaltTex = this.createProceduralTexture('asphalt');
+    const brickTex = this.createProceduralTexture('brick');
+    const roofTex = this.createProceduralTexture('roof');
+    const concreteTex = this.createProceduralTexture('concrete');
+    const windowGridTex = this.createProceduralTexture('windowGrid');
+
     // Geometries
     this.sharedGeos.car = new THREE.BoxGeometry(0.18, 0.1, 0.32);
     this.sharedGeos.bus = new THREE.BoxGeometry(0.24, 0.16, 0.55);
@@ -256,12 +339,30 @@ export class ThreeSceneManager {
     });
 
     // Pastel Clean Road Materials
-    this.materials.asphalt = new THREE.MeshStandardMaterial({ color: 0x505d6e, roughness: 0.8 });
-    this.materials.highwayAsphalt = new THREE.MeshStandardMaterial({ color: 0x414d5e, roughness: 0.75 });
+    this.materials.asphalt = new THREE.MeshStandardMaterial({
+      color: 0x505d6e,
+      roughness: 0.8,
+      map: asphaltTex,
+      bumpMap: asphaltTex,
+      bumpScale: 0.02,
+    });
+    this.materials.highwayAsphalt = new THREE.MeshStandardMaterial({
+      color: 0x414d5e,
+      roughness: 0.75,
+      map: asphaltTex,
+      bumpMap: asphaltTex,
+      bumpScale: 0.02,
+    });
     this.materials.roadLine = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
     this.materials.crosswalk = new THREE.MeshBasicMaterial({ color: 0xffffff });
     this.materials.highwayYellow = new THREE.MeshBasicMaterial({ color: 0xfde047 });
-    this.materials.sidewalk = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.9 });
+    this.materials.sidewalk = new THREE.MeshStandardMaterial({
+      color: 0xe2e8f0,
+      roughness: 0.9,
+      map: concreteTex,
+      bumpMap: concreteTex,
+      bumpScale: 0.015,
+    });
     this.materials.curb = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.9 });
 
     // 1. Residential Palette: Warm community neighborhood tones (terracotta, cream, mint, sage, blush, cedar wood)
@@ -270,12 +371,18 @@ export class ThreeSceneManager {
     this.materials.resBlush = new THREE.MeshStandardMaterial({ color: 0xfbcfe8, roughness: 0.65 });
     this.materials.resLavender = new THREE.MeshStandardMaterial({ color: 0xe9d5ff, roughness: 0.65 });
     this.materials.resPowder = new THREE.MeshStandardMaterial({ color: 0xbae6fd, roughness: 0.65 });
-    this.materials.resTerracotta = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.75 });
+    this.materials.resTerracotta = new THREE.MeshStandardMaterial({
+      color: 0xd97706,
+      roughness: 0.75,
+      map: roofTex,
+      bumpMap: roofTex,
+      bumpScale: 0.03,
+    });
     this.materials.resSage = new THREE.MeshStandardMaterial({ color: 0x86efac, roughness: 0.7 });
     this.materials.resWood = new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.75 });
     this.materials.resDarkWood = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.8 });
     this.materials.resParapet = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.5 });
-    this.materials.resBrickChimney = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.85 });
+    this.materials.resBrickChimney = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.85, map: brickTex, bumpMap: brickTex, bumpScale: 0.03 });
     this.materials.resPlanter = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.8 });
     this.materials.resFlower1 = new THREE.MeshBasicMaterial({ color: 0xf472b6 });
     this.materials.resFlower2 = new THREE.MeshBasicMaterial({ color: 0xfbbf24 });
@@ -291,6 +398,7 @@ export class ThreeSceneManager {
       color: 0xc7d2fe,
       roughness: 0.15,
       metalness: 0.35,
+      map: windowGridTex,
       transparent: true,
       opacity: 0.85,
     });
@@ -321,7 +429,13 @@ export class ThreeSceneManager {
     this.neonMaterials.push(this.materials.comNeonYellow as THREE.MeshStandardMaterial);
 
     // 3. Industrial Palette: Heavy factory & manufacturing tones (brick russet, iron slate, caution yellow, pipes)
-    this.materials.indBrick = new THREE.MeshStandardMaterial({ color: 0x9a3412, roughness: 0.9 });
+    this.materials.indBrick = new THREE.MeshStandardMaterial({
+      color: 0x9a3412,
+      roughness: 0.9,
+      map: brickTex,
+      bumpMap: brickTex,
+      bumpScale: 0.04,
+    });
     this.materials.indSlate = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.7 });
     this.materials.indCharcoal = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.75 });
     this.materials.indCautionYellow = new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.5 });
