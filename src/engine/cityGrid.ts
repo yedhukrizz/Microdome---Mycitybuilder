@@ -218,6 +218,33 @@ export class CityManager {
 
   public highwayPortalCoord: { x: number; z: number } = { x: 8, z: 0 };
 
+  public exportData(): any {
+    return {
+      grid: this.grid,
+      budget: this.budget,
+      stats: this.stats,
+      demands: this.demands,
+      milestones: this.milestones,
+      vehicles: this.vehicles,
+      pedestrians: this.pedestrians,
+      history: this.history,
+      highwayPortalCoord: this.highwayPortalCoord,
+    };
+  }
+
+  public importData(data: any) {
+    if (!data) return;
+    if (data.grid) this.grid = data.grid;
+    if (data.budget) this.budget = data.budget;
+    if (data.stats) this.stats = data.stats;
+    if (data.demands) this.demands = data.demands;
+    if (data.milestones) this.milestones = data.milestones;
+    if (data.vehicles) this.vehicles = data.vehicles;
+    if (data.pedestrians) this.pedestrians = data.pedestrians;
+    if (data.history) this.history = data.history;
+    if (data.highwayPortalCoord) this.highwayPortalCoord = data.highwayPortalCoord;
+  }
+
   private simAccumulator = 0;
   private weekAccumulator = 0;
   private vehicleIdCounter = 0;

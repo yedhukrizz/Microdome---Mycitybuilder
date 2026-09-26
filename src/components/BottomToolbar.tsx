@@ -137,11 +137,11 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   }
 
   return (
-    <div className="fixed bottom-2 sm:bottom-4 left-0 right-0 z-50 flex justify-center px-2 sm:px-4 pointer-events-none select-none">
-      <div className="pointer-events-auto flex flex-col-reverse items-center gap-2 max-w-[98vw] sm:max-w-max w-full">
+    <div className="fixed bottom-2 sm:bottom-3 md:bottom-4 left-0 right-0 z-50 flex justify-center px-2 sm:px-4 pointer-events-none select-none">
+      <div className="pointer-events-auto flex flex-col-reverse items-center gap-1.5 sm:gap-2 max-w-[99vw] sm:max-w-max w-full">
         {/* Main Glassmorphic Dock */}
         <div
-          className={`flex items-center gap-1 sm:gap-2 p-1.5 sm:p-2.5 rounded-2xl sm:rounded-3xl border shadow-2xl backdrop-blur-2xl transition-all overflow-x-auto max-w-full scrollbar-none ${
+          className={`flex items-center gap-1 sm:gap-1.5 p-1.5 sm:p-2 rounded-xl sm:rounded-2xl border shadow-2xl backdrop-blur-2xl transition-all overflow-x-auto max-w-full scrollbar-none text-xs ${
             isLight
               ? 'bg-white/95 border-neutral-200/90 text-neutral-900 shadow-neutral-300/60'
               : 'bg-neutral-950/92 border-neutral-800/80 text-white shadow-black/90'

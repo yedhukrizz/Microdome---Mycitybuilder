@@ -21,6 +21,8 @@ interface SettingsModalProps {
   onSelectPreset: (preset: 'starter' | 'busy' | 'delta') => void;
   onSaveGame: () => void;
   onLoadGame: () => void;
+  onDownloadJson?: () => void;
+  onReturnHome?: () => void;
   hasSavedGame: boolean;
   onClose: () => void;
   isMuted: boolean;
@@ -33,6 +35,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onSelectPreset,
   onSaveGame,
   onLoadGame,
+  onDownloadJson,
+  onReturnHome,
   hasSavedGame,
   onClose,
   isMuted,
@@ -382,31 +386,64 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </button>
             </div>
 
-            <div className="flex items-center gap-3 pt-1">
-              <button
-                type="button"
-                onClick={onSaveGame}
-                className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold transition-colors cursor-pointer"
-              >
-                <Save className="w-3.5 h-3.5" />
-                <span>Save City</span>
-              </button>
+            <div className="flex flex-col gap-2 pt-1">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={onSaveGame}
+                  className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold transition-colors cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Save City</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={onLoadGame}
-                disabled={!hasSavedGame}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg font-semibold transition-colors cursor-pointer border ${
-                  hasSavedGame
-                    ? isLight
-                      ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border-neutral-300'
-                      : 'bg-neutral-900 hover:bg-neutral-800 text-white border-neutral-700'
-                    : 'opacity-40 cursor-not-allowed border-transparent'
-                }`}
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Load City</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={onLoadGame}
+                  disabled={!hasSavedGame}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg font-semibold transition-colors cursor-pointer border ${
+                    hasSavedGame
+                      ? isLight
+                        ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border-neutral-300'
+                        : 'bg-neutral-900 hover:bg-neutral-800 text-white border-neutral-700'
+                      : 'opacity-40 cursor-not-allowed border-transparent'
+                  }`}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Load City</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {onDownloadJson && (
+                  <button
+                    type="button"
+                    onClick={onDownloadJson}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg font-semibold transition-colors cursor-pointer border ${
+                      isLight
+                        ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border-neutral-300'
+                        : 'bg-neutral-900 hover:bg-neutral-800 text-white border-neutral-700'
+                    }`}
+                  >
+                    <Download className="w-3.5 h-3.5 text-sky-500" />
+                    <span>Download Save (.json)</span>
+                  </button>
+                )}
+
+                {onReturnHome && (
+                  <button
+                    type="button"
+                    onClick={onReturnHome}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg font-semibold transition-colors cursor-pointer border ${
+                      isLight
+                        ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-300'
+                        : 'bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border-rose-800/60'
+                    }`}
+                  >
+                    <span>Main Menu / Home</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 

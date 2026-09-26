@@ -40,6 +40,7 @@ export class ThreeSceneManager {
   public hoveredCoord: { x: number; z: number } | null = null;
   public selectedTileCoord: { x: number; z: number } | null = null;
   public onCellClicked?: (x: number, z: number) => void;
+  public onCrash?: () => void;
   public buildModeActive: boolean = true; // Build mode: taps/clicks build immediately
   public dragBuildMode: boolean = true; // Drag to paint roads/zones
   public placementMode: 'confirm' | 'rapid' = 'confirm'; // 'confirm' = safe click with checkbox, 'rapid' = continuous paint
@@ -125,11 +126,17 @@ export class ThreeSceneManager {
     // Prevent graphic glitches and handle context loss on mobile / MediaTek devices
     this.renderer.domElement.addEventListener('webglcontextlost', (event) => {
       event.preventDefault();
-      console.warn('WebGL context lost. Attempting recovery...');
+      console.warn('WebGL context lost. Pausing render loop...');
+      if (this.animFrameId) cancelAnimationFrame(this.animFrameId);
     }, false);
 
     this.renderer.domElement.addEventListener('webglcontextrestored', () => {
-      console.info('WebGL context restored.');
+      console.info('WebGL context restored. Rebuilding scene & restarting render loop...');
+      this.initSharedResources();
+      this.buildTerrain();
+      this.buildFoliage();
+      this.rebuildCityScene();
+      this.startLoop();
     }, false);
 
     // 4. Warm Soft Isometric Lights
@@ -2665,6 +2672,8 @@ export class ThreeSceneManager {
       this.ambientLight.intensity = 0.38;
     }
 
+    this.renderer.toneMappingExposure = Math.min(1.2, Math.max(0.85, 1.05 + sunHeight * 0.1));
+
     // Dynamic Night Building Lights & Storefront Illumination
     const winEmissive = 0.2 + nightFactor * 1.6;
     for (let i = 0; i < this.windowMaterials.length; i++) {
@@ -3173,47 +3182,54 @@ export class ThreeSceneManager {
     let lastTime = performance.now();
 
     const loop = (currentTime: number) => {
-      const delta = (currentTime - lastTime) / 1000;
-      lastTime = currentTime;
+      try {
+        const delta = (currentTime - lastTime) / 1000;
+        lastTime = currentTime;
 
-      // Rotate windmill blades
-      this.windTurbineRotors.forEach((rotor) => {
-        rotor.rotation.z += delta * 2.8;
-      });
+        // Rotate windmill blades
+        this.windTurbineRotors.forEach((rotor) => {
+          rotor.rotation.z += delta * 2.8;
+        });
 
-      // Animate smoke particles
-      this.smokeParticles.forEach((sp) => {
-        sp.mesh.position.y += delta * sp.speed;
-        const age = sp.mesh.position.y - sp.initialY;
-        const scale = 1 + age * 1.5;
-        sp.mesh.scale.set(scale, scale, scale);
-        (sp.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.45 - age * 0.3);
+        // Animate smoke particles
+        this.smokeParticles.forEach((sp) => {
+          sp.mesh.position.y += delta * sp.speed;
+          const age = sp.mesh.position.y - sp.initialY;
+          const scale = 1 + age * 1.5;
+          sp.mesh.scale.set(scale, scale, scale);
+          (sp.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.45 - age * 0.3);
 
-        if (age > 1.4) {
-          sp.mesh.position.y = sp.initialY;
-          sp.mesh.scale.set(1, 1, 1);
+          if (age > 1.4) {
+            sp.mesh.position.y = sp.initialY;
+            sp.mesh.scale.set(1, 1, 1);
+          }
+        });
+
+        // Advance lively entities (cars and pedestrians) smoothly at 60 FPS!
+        this.city.updateLivelyEntities(delta);
+
+        // Subtle breathing / idle sway for citizens gathered in the parks!
+        if (this.parkCitizens.length > 0) {
+          const t = currentTime * 0.0025;
+          for (let i = 0; i < this.parkCitizens.length; i++) {
+            const c = this.parkCitizens[i];
+            c.rotation.y += Math.sin(t + i * 1.3) * 0.003;
+            c.position.y += Math.sin(t * 2 + i * 0.9) * 0.0002;
+          }
         }
-      });
 
-      // Advance lively entities (cars and pedestrians) smoothly at 60 FPS!
-      this.city.updateLivelyEntities(delta);
+        this.updateDayNightCycle();
+        this.updateVehiclesRendering();
+        this.updatePedestriansRendering();
 
-      // Subtle breathing / idle sway for citizens gathered in the parks!
-      if (this.parkCitizens.length > 0) {
-        const t = currentTime * 0.0025;
-        for (let i = 0; i < this.parkCitizens.length; i++) {
-          const c = this.parkCitizens[i];
-          c.rotation.y += Math.sin(t + i * 1.3) * 0.003;
-          c.position.y += Math.sin(t * 2 + i * 0.9) * 0.0002;
+        this.renderer.render(this.scene, this.camera);
+        this.animFrameId = requestAnimationFrame(loop);
+      } catch (err) {
+        console.error('Three.js render loop exception:', err);
+        if (this.onCrash) {
+          this.onCrash();
         }
       }
-
-      this.updateDayNightCycle();
-      this.updateVehiclesRendering();
-      this.updatePedestriansRendering();
-
-      this.renderer.render(this.scene, this.camera);
-      this.animFrameId = requestAnimationFrame(loop);
     };
 
     this.animFrameId = requestAnimationFrame(loop);

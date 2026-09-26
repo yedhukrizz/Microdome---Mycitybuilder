@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Sparkles } from 'lucide-react';
 import { CityManager } from './engine/cityGrid';
 import { ThreeSceneManager } from './engine/threeScene';
 import { soundEngine } from './audio/soundEngine';
@@ -17,6 +18,7 @@ import { OverlayLegend } from './components/OverlayLegend';
 import { MilestoneCelebration } from './components/MilestoneCelebration';
 import { TouchControls } from './components/TouchControls';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { HomeScreen } from './components/HomeScreen';
 import {
   ActiveTool,
   CellData,
@@ -117,7 +119,31 @@ function MainGame() {
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [celebratingMilestone, setCelebratingMilestone] = useState<Milestone | null>(null);
-  const [hasSavedGame, setHasSavedGame] = useState<boolean>(false);
+  
+  const [viewMode, setViewMode] = useState<'home' | 'game'>('home');
+  const [threeSceneCrashed, setThreeSceneCrashed] = useState<boolean>(false);
+  const pendingActionRef = useRef<'load' | 'starter' | 'busy' | 'delta' | null>(null);
+  const [hasSavedGame, setHasSavedGame] = useState<boolean>(() => {
+    try {
+      return !!localStorage.getItem('skyline_architect_save');
+    } catch {
+      return false;
+    }
+  });
+  const [savedGameSummary, setSavedGameSummary] = useState<{ population: number; treasury: number; date: string } | null>(() => {
+    try {
+      const raw = localStorage.getItem('skyline_architect_save');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return {
+          population: parsed.stats?.population || 0,
+          treasury: parsed.budget?.treasury || 75000,
+          date: new Date().toLocaleDateString(),
+        };
+      }
+    } catch {}
+    return null;
+  });
 
   // Dedicated Road Corridor Route Builder states
   const [roadCorridorMode, setRoadCorridorMode] = useState<boolean>(false);
@@ -165,16 +191,53 @@ function MainGame() {
     }
   }, []);
 
-  // Initialize Three.js scene and CityManager
+  // Initialize Three.js scene and CityManager when in game view
   useEffect(() => {
-    if (!canvasContainerRef.current) return;
+    if (viewMode !== 'game' || !canvasContainerRef.current) return;
 
-    const city = new CityManager('starter');
-    cityManagerRef.current = city;
+    if (!cityManagerRef.current) {
+      cityManagerRef.current = new CityManager('starter');
+    }
+    const city = cityManagerRef.current;
 
     const scene = new ThreeSceneManager(canvasContainerRef.current, city);
     threeSceneRef.current = scene;
     scene.setContactShadows(contactShadows);
+    scene.setGraphicsQuality(graphicsQuality);
+    scene.onCrash = () => {
+      setThreeSceneCrashed(true);
+    };
+
+    if (pendingActionRef.current === 'load') {
+      try {
+        const raw = localStorage.getItem('skyline_architect_save');
+        if (raw) {
+          const data = JSON.parse(raw);
+          city.importData(data);
+          city.recalculateRoadConnections();
+          city.recomputeNetworksAndSimulation(true);
+          scene.buildTerrain();
+          scene.buildFoliage();
+          scene.rebuildCityScene();
+        }
+      } catch (e) {
+        console.error('Pending load failed', e);
+      }
+      pendingActionRef.current = null;
+    } else if (pendingActionRef.current) {
+      const preset = pendingActionRef.current as 'starter' | 'busy' | 'delta';
+      city.initMap(preset);
+      scene.buildTerrain();
+      scene.buildFoliage();
+      scene.rebuildCityScene();
+      pendingActionRef.current = null;
+    } else {
+      scene.rebuildCityScene();
+    }
+
+    setStats({ ...city.stats });
+    setBudget({ ...city.budget });
+    setDemands({ ...city.demands });
 
     city.onMilestoneAchieved = (m: Milestone) => {
       soundEngine.playMilestone();
@@ -222,7 +285,7 @@ function MainGame() {
       clearInterval(interval);
       scene.dispose();
     };
-  }, []);
+  }, [viewMode]);
 
   // Sync contact shadows & graphics quality
   useEffect(() => {
@@ -441,22 +504,24 @@ function MainGame() {
     showToast(`Bond of $${amount.toLocaleString()} received!`);
   };
 
-  const handleSelectPreset = (preset: 'starter' | 'busy' | 'delta') => {
+  const handleStartNewGame = (preset: 'starter' | 'busy' | 'delta') => {
+    pendingActionRef.current = preset;
+    setViewMode('game');
+    setActiveModal(null);
     const city = cityManagerRef.current;
     const scene = threeSceneRef.current;
-    if (!city || !scene) return;
-
-    city.initMap(preset);
-    scene.buildTerrain();
-    scene.buildFoliage();
-    scene.rebuildCityScene();
-
-    setStats({ ...city.stats });
-    setBudget({ ...city.budget });
-    setDemands({ ...city.demands });
-    setInspectedCell(null);
-    soundEngine.playMilestone();
-    showToast(`Loaded ${preset.toUpperCase()} scenario with highway portal!`);
+    if (city && scene) {
+      city.initMap(preset);
+      scene.buildTerrain();
+      scene.buildFoliage();
+      scene.rebuildCityScene();
+      setStats({ ...city.stats });
+      setBudget({ ...city.budget });
+      setDemands({ ...city.demands });
+      setInspectedCell(null);
+      soundEngine.playMilestone();
+      showToast(`Loaded ${preset.toUpperCase()} scenario!`);
+    }
   };
 
   const handleSaveGame = () => {
@@ -474,6 +539,11 @@ function MainGame() {
       };
       localStorage.setItem('skyline_architect_save', JSON.stringify(saveData));
       setHasSavedGame(true);
+      setSavedGameSummary({
+        population: city.stats.population,
+        treasury: city.budget.treasury,
+        date: new Date().toLocaleDateString(),
+      });
       soundEngine.playCoin();
       showToast('City saved successfully!');
     } catch {
@@ -482,15 +552,71 @@ function MainGame() {
   };
 
   const handleLoadGame = () => {
+    pendingActionRef.current = 'load';
+    setViewMode('game');
+    setActiveModal(null);
+    const city = cityManagerRef.current;
+    const scene = threeSceneRef.current;
+    if (city && scene) {
+      try {
+        const raw = localStorage.getItem('skyline_architect_save');
+        if (!raw) {
+          showToast('No saved game found.');
+          return;
+        }
+        const data = JSON.parse(raw);
+        city.importData(data);
+        city.recalculateRoadConnections();
+        city.recomputeNetworksAndSimulation(true);
+        scene.buildTerrain();
+        scene.buildFoliage();
+        scene.rebuildCityScene();
+        setStats({ ...city.stats });
+        setBudget({ ...city.budget });
+        setDemands({ ...city.demands });
+        setInspectedCell(null);
+        soundEngine.playMilestone();
+        showToast('Saved city loaded successfully!');
+      } catch {
+        showToast('Failed to load saved game.');
+      }
+    }
+  };
+
+  const handleDownloadJson = () => {
+    const city = cityManagerRef.current;
+    if (!city) return;
+    try {
+      const saveData = {
+        grid: city.grid,
+        budget: city.budget,
+        stats: city.stats,
+        demands: city.demands,
+        milestones: city.milestones,
+        highwayPortalCoord: city.highwayPortalCoord,
+      };
+      const jsonStr = JSON.stringify(saveData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `urbanite_city_${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('City JSON downloaded!');
+      soundEngine.playCoin();
+    } catch {
+      showToast('Failed to download city JSON.');
+    }
+  };
+
+  const handleImportGameJson = (jsonString: string) => {
     const city = cityManagerRef.current;
     const scene = threeSceneRef.current;
     if (!city || !scene) return;
 
     try {
-      const raw = localStorage.getItem('skyline_architect_save');
-      if (!raw) return;
-      const data = JSON.parse(raw);
-
+      const data = JSON.parse(jsonString);
       city.grid = data.grid;
       city.budget = data.budget;
       city.stats = data.stats;
@@ -509,10 +635,12 @@ function MainGame() {
       setBudget({ ...city.budget });
       setDemands({ ...city.demands });
       setInspectedCell(null);
+      setViewMode('game');
+      setActiveModal(null);
       soundEngine.playMilestone();
-      showToast('Saved city loaded successfully!');
+      showToast('City imported successfully!');
     } catch {
-      showToast('Failed to load saved game.');
+      showToast('Invalid city JSON save file.');
     }
   };
 
@@ -582,7 +710,42 @@ function MainGame() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [stats.simulationSpeed, toggleUndistractedMode]);
 
+  // Auto-save interval in game mode
+  useEffect(() => {
+    if (viewMode === 'game') {
+      const autoSaveInterval = setInterval(() => {
+        if (cityManagerRef.current) {
+          const saveData = {
+            grid: cityManagerRef.current.grid,
+            budget: cityManagerRef.current.budget,
+            stats: cityManagerRef.current.stats,
+            demands: cityManagerRef.current.demands,
+            milestones: cityManagerRef.current.milestones,
+            highwayPortalCoord: cityManagerRef.current.highwayPortalCoord,
+          };
+          localStorage.setItem('skyline_architect_save', JSON.stringify(saveData));
+          setHasSavedGame(true);
+        }
+      }, 45000);
+      return () => clearInterval(autoSaveInterval);
+    }
+  }, [viewMode]);
+
   const isLight = theme === 'light';
+
+  if (viewMode === 'home') {
+    return (
+      <HomeScreen
+        onStartNewGame={handleStartNewGame}
+        onLoadGame={handleLoadGame}
+        onImportGameJson={handleImportGameJson}
+        hasSavedGame={hasSavedGame}
+        savedGameSummary={savedGameSummary}
+        isMuted={isMuted}
+        onToggleMute={handleToggleMute}
+      />
+    );
+  }
 
   return (
     <div
@@ -725,7 +888,7 @@ function MainGame() {
 
       {activeModal === 'presets' && (
         <PresetsModal
-          onSelectPreset={handleSelectPreset}
+          onSelectPreset={handleStartNewGame}
           onSaveGame={handleSaveGame}
           onLoadGame={handleLoadGame}
           hasSavedGame={hasSavedGame}
@@ -735,9 +898,15 @@ function MainGame() {
 
       {activeModal === 'settings' && (
         <SettingsModal
-          onSelectPreset={handleSelectPreset}
+          onSelectPreset={handleStartNewGame}
           onSaveGame={handleSaveGame}
           onLoadGame={handleLoadGame}
+          onDownloadJson={handleDownloadJson}
+          onReturnHome={() => {
+            handleSaveGame();
+            setViewMode('home');
+            setActiveModal(null);
+          }}
           hasSavedGame={hasSavedGame}
           onClose={() => setActiveModal(null)}
           isMuted={isMuted}
@@ -753,6 +922,42 @@ function MainGame() {
           milestone={celebratingMilestone}
           onDismiss={() => setCelebratingMilestone(null)}
         />
+      )}
+
+      {/* 3D Render Crash / Whiteout Recovery Modal */}
+      {threeSceneCrashed && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in">
+          <div className="max-w-md w-full bg-neutral-900 border border-neutral-700 rounded-2xl p-6 text-center space-y-4 shadow-2xl text-white">
+            <div className="w-12 h-12 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold">3D Graphics Context Interrupted</h3>
+            <p className="text-xs text-neutral-400 leading-relaxed">
+              Your browser GPU or WebGL context was paused. Click below to instantly reload the 3D renderer without losing any of your city building progress or save data!
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setThreeSceneCrashed(false);
+                if (threeSceneRef.current) {
+                  threeSceneRef.current.dispose();
+                  threeSceneRef.current = null;
+                }
+                if (canvasContainerRef.current && cityManagerRef.current) {
+                  const scene = new ThreeSceneManager(canvasContainerRef.current, cityManagerRef.current);
+                  threeSceneRef.current = scene;
+                  scene.setContactShadows(contactShadows);
+                  scene.setGraphicsQuality(graphicsQuality);
+                  scene.onCrash = () => setThreeSceneCrashed(true);
+                  scene.rebuildCityScene();
+                }
+              }}
+              className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all cursor-pointer shadow-lg"
+            >
+              Reload 3D Renderer (Keep Progress)
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Toast notifications */}
