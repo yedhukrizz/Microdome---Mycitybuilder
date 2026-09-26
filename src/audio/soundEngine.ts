@@ -1,6 +1,6 @@
 /**
  * Procedural Web Audio API sound synthesizer
- * Zero external audio latency, fully responsive and self-contained
+ * Zero enxternal audio latency, fully responsive and self-contained
  */
 class SoundEngine {
   private ctx: AudioContext | null = null;
