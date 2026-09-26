@@ -101,6 +101,11 @@ function MainGame() {
     commercial: 35,
     industrial: 45,
     office: 30,
+    education: 40,
+    fire: 25,
+    health: 30,
+    entertainment: 35,
+    parks: 30,
   });
 
   const [activeTool, setActiveTool] = useState<ActiveTool>({ category: 'zones', zoneType: 'residential' });
