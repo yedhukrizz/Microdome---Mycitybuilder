@@ -23,6 +23,7 @@ import {
   Sun,
   ChevronUp,
   ChevronDown,
+  Car,
 } from 'lucide-react';
 import { ActiveTool, OverlayMode } from '../types/city';
 import { soundEngine } from '../audio/soundEngine';
@@ -82,6 +83,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
 
   const isCivicOrUtilityActive = activeTool.category === 'services' || activeTool.category === 'utilities';
   const isRoadsActive = activeTool.category === 'roads';
+  const isZonesActive = activeTool.category === 'zones';
 
   const getToolDisplayName = () => {
     if (activeTool.category === 'roads') {
@@ -90,10 +92,10 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
       return 'Two-Lane Local Road ($20)';
     }
     if (activeTool.category === 'zones') {
-      if (activeTool.zoneType === 'residential') return 'Residential Zone';
-      if (activeTool.zoneType === 'commercial') return 'Commercial Zone';
-      if (activeTool.zoneType === 'industrial') return 'Industrial Zone';
-      if (activeTool.zoneType === 'office') return 'Office Zone';
+      if (activeTool.zoneType === 'residential') return 'Residential Zone (Home)';
+      if (activeTool.zoneType === 'commercial') return 'Commercial Zone (Shop)';
+      if (activeTool.zoneType === 'industrial') return 'Industrial Zone (Factory)';
+      if (activeTool.zoneType === 'office') return 'Office Zone (Corporate)';
     }
     if (activeTool.category === 'utilities') {
       if (activeTool.serviceType === 'wind_turbine') return 'Wind Turbine ($6,000)';
@@ -108,69 +110,69 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
       if (activeTool.serviceType === 'fire_station') return 'Fire Department ($10,000)';
       if (activeTool.serviceType === 'police_station') return 'Police Precinct ($11,000)';
       if (activeTool.serviceType === 'small_park') return 'Neighborhood Park ($3,000)';
+      if (activeTool.serviceType === 'parking_lot') return 'Park & Ride Lot ($1,500)';
     }
     if (activeTool.category === 'bulldoze') return 'Demolish Tool';
     return 'Inspect / Pan Tool';
   };
 
-  // If player enabled undistracted mode and docked, show minimal peek pill
   if (undistractedMode && isDockCollapsed) {
     return (
-      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-30 select-none animate-in fade-in duration-200">
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 select-none animate-in fade-in duration-200">
         <button
           type="button"
           onClick={() => setIsDockCollapsed(false)}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-2xl backdrop-blur-md cursor-pointer transition-all hover:scale-105 ${
+          className={`flex items-center gap-2.5 px-4 py-2 rounded-full border shadow-2xl backdrop-blur-xl cursor-pointer transition-all hover:scale-105 ${
             isLight
-              ? 'bg-white/95 text-neutral-900 border-neutral-300'
-              : 'bg-black/92 text-white border-neutral-700'
+              ? 'bg-white/95 text-neutral-900 border-neutral-300 shadow-neutral-300/50'
+              : 'bg-neutral-900/95 text-white border-neutral-700 shadow-black/80'
           }`}
         >
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="font-semibold text-xs">{getToolDisplayName()}</span>
-          <ChevronUp className="w-3.5 h-3.5 text-neutral-400" />
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="font-bold text-xs tracking-wide">{getToolDisplayName()}</span>
+          <ChevronUp className="w-4 h-4 text-neutral-400" />
         </button>
       </div>
     );
   }
 
   return (
-    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-1 select-none max-w-[98vw]">
-      {/* Sub-Ribbon: Roads / Corridor Builder */}
+    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-2 select-none max-w-[98vw]">
+      {/* Sub-Ribbon: Roads & Corridors */}
       {isBuildMode && isRoadsActive && (
         <div
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl border shadow-xl text-[10px] backdrop-blur-md animate-in fade-in duration-150 ${
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border shadow-2xl text-xs backdrop-blur-xl animate-in slide-in-from-bottom-2 duration-200 ${
             isLight
-              ? 'bg-white/95 border-neutral-200 text-neutral-800'
-              : 'bg-black/95 border-neutral-800 text-white'
+              ? 'bg-white/95 border-neutral-200 text-neutral-800 shadow-neutral-200/50'
+              : 'bg-neutral-950/95 border-neutral-800 text-white shadow-black/80'
           }`}
         >
-          <span className="font-bold flex items-center gap-1 shrink-0 text-emerald-500">
-            <Route className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Road Type:</span>
+          <span className="font-bold flex items-center gap-1.5 text-emerald-500 px-1">
+            <Route className="w-4 h-4" />
+            <span className="hidden sm:inline">Network:</span>
           </span>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={() => selectTool({ category: 'roads', roadType: 'two_lane' })}
-              className={`px-2 py-0.5 rounded font-semibold transition-all cursor-pointer whitespace-nowrap ${
+              className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                 isToolActive('roads', 'two_lane')
-                  ? 'bg-emerald-600 text-white shadow-xs'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-400/50 scale-105'
                   : isLight
                   ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
                   : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
               }`}
             >
-              Local Road ($20)
+              Local ($20)
             </button>
 
             <button
               type="button"
               onClick={() => selectTool({ category: 'roads', roadType: 'avenue' })}
-              className={`px-2 py-0.5 rounded font-semibold transition-all cursor-pointer whitespace-nowrap ${
+              className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                 isToolActive('roads', 'avenue')
-                  ? 'bg-emerald-600 text-white shadow-xs'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-400/50 scale-105'
                   : isLight
                   ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
                   : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
@@ -182,9 +184,9 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
             <button
               type="button"
               onClick={() => selectTool({ category: 'roads', roadType: 'highway' })}
-              className={`px-2 py-0.5 rounded font-semibold transition-all cursor-pointer whitespace-nowrap ${
+              className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                 isToolActive('roads', 'highway')
-                  ? 'bg-emerald-600 text-white shadow-xs'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-400/50 scale-105'
                   : isLight
                   ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
                   : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
@@ -194,33 +196,32 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
             </button>
           </div>
 
-          <div className={`h-3 w-px mx-0.5 ${isLight ? 'bg-neutral-300' : 'bg-neutral-800'}`} />
+          <div className={`h-4 w-px mx-1 ${isLight ? 'bg-neutral-300' : 'bg-neutral-800'}`} />
 
-          {/* Corridor Mode Toggle */}
           {onToggleRoadCorridorMode && (
             <button
               type="button"
               onClick={onToggleRoadCorridorMode}
-              className={`px-2 py-0.5 rounded font-semibold transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap ${
+              className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap text-xs ${
                 roadCorridorMode
-                  ? 'bg-amber-500 text-black font-bold shadow-xs'
+                  ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/30 ring-2 ring-amber-300 scale-105'
                   : isLight
                   ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
                   : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
               }`}
             >
-              <span>{roadCorridorMode ? '📐 Route Mode' : '✏️ Paint'}</span>
+              <span>{roadCorridorMode ? '📐 Route Mode' : '✏️ Paint Mode'}</span>
             </button>
           )}
 
           {roadCorridorStart && (
-            <div className="flex items-center gap-1 text-[9px] text-amber-500 font-mono">
+            <div className="flex items-center gap-1.5 text-xs text-amber-500 font-mono pl-1">
               <span>Start [{roadCorridorStart.x},{roadCorridorStart.z}]</span>
               {onCancelCorridor && (
                 <button
                   type="button"
                   onClick={onCancelCorridor}
-                  className="px-1 text-rose-500 hover:underline cursor-pointer"
+                  className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 font-bold cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -230,213 +231,296 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
         </div>
       )}
 
-      {/* Sub-Ribbon: Civic & Utilities Buildings */}
-      {isBuildMode && isCivicOrUtilityActive && (
+      {/* Sub-Ribbon: Zones */}
+      {isBuildMode && isZonesActive && (
         <div
-          className={`flex items-center gap-1 px-2 py-1 rounded-xl border shadow-xl text-[10px] backdrop-blur-md animate-in fade-in duration-150 overflow-x-auto max-w-[96vw] scrollbar-none ${
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border shadow-2xl text-xs backdrop-blur-xl animate-in slide-in-from-bottom-2 duration-200 ${
             isLight
-              ? 'bg-white/95 border-neutral-200 text-neutral-800'
-              : 'bg-black/95 border-neutral-800 text-white'
+              ? 'bg-white/95 border-neutral-200 text-neutral-800 shadow-neutral-200/50'
+              : 'bg-neutral-950/95 border-neutral-800 text-white shadow-black/80'
           }`}
         >
-          <span className="font-bold flex items-center gap-1 shrink-0 px-1 text-emerald-500">
-            <Building2 className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Civic:</span>
+          <span className="font-bold flex items-center gap-1.5 text-emerald-500 px-1">
+            <Building2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Zoning:</span>
           </span>
 
-          <div className="flex items-center gap-1 shrink-0">
-            {/* Clinic */}
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => selectTool({ category: 'services', serviceType: 'clinic' })}
-              className={`px-2 py-1 rounded-md flex items-center gap-1 font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                isToolActive('services', 'clinic')
-                  ? 'bg-rose-600 text-white font-bold ring-1 ring-rose-300'
+              onClick={() => selectTool({ category: 'zones', zoneType: 'residential' })}
+              className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs ${
+                isToolActive('zones', 'residential')
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-400/50 scale-105'
                   : isLight
                   ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
                   : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
               }`}
             >
-              <HeartPulse className="w-3 h-3 text-rose-400" />
-              <span>Clinic ($8k)</span>
+              <Home className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Residential</span>
             </button>
 
-            {/* Hospital */}
             <button
               type="button"
-              onClick={() => selectTool({ category: 'services', serviceType: 'hospital' })}
-              className={`px-2 py-1 rounded-md flex items-center gap-1 font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                isToolActive('services', 'hospital')
-                  ? 'bg-rose-600 text-white font-bold ring-1 ring-rose-300'
+              onClick={() => selectTool({ category: 'zones', zoneType: 'commercial' })}
+              className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs ${
+                isToolActive('zones', 'commercial')
+                  ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30 ring-2 ring-sky-400/50 scale-105'
                   : isLight
                   ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
                   : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
               }`}
             >
-              <Hospital className="w-3 h-3 text-rose-300" />
-              <span>Hospital ($28k)</span>
+              <ShoppingBag className="w-3.5 h-3.5 text-sky-400" />
+              <span>Commercial</span>
             </button>
 
-            {/* School */}
             <button
               type="button"
-              onClick={() => selectTool({ category: 'services', serviceType: 'elementary_school' })}
-              className={`px-2 py-1 rounded-md flex items-center gap-1 font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                isToolActive('services', 'elementary_school')
-                  ? 'bg-amber-600 text-white font-bold ring-1 ring-amber-300'
+              onClick={() => selectTool({ category: 'zones', zoneType: 'industrial' })}
+              className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs ${
+                isToolActive('zones', 'industrial')
+                  ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30 ring-2 ring-amber-400/50 scale-105'
                   : isLight
                   ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
                   : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
               }`}
             >
-              <School className="w-3 h-3 text-amber-400" />
-              <span>School ($12k)</span>
+              <Factory className="w-3.5 h-3.5 text-amber-400" />
+              <span>Industrial</span>
             </button>
 
-            {/* University */}
             <button
               type="button"
-              onClick={() => selectTool({ category: 'services', serviceType: 'university' })}
-              className={`px-2 py-1 rounded-md flex items-center gap-1 font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                isToolActive('services', 'university')
-                  ? 'bg-amber-600 text-white font-bold ring-1 ring-amber-300'
+              onClick={() => selectTool({ category: 'zones', zoneType: 'office' })}
+              className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs ${
+                isToolActive('zones', 'office')
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 ring-2 ring-blue-400/50 scale-105'
                   : isLight
                   ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
                   : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
               }`}
             >
-              <GraduationCap className="w-3 h-3 text-amber-300" />
-              <span>University ($45k)</span>
-            </button>
-
-            {/* Fire */}
-            <button
-              type="button"
-              onClick={() => selectTool({ category: 'services', serviceType: 'fire_station' })}
-              className={`px-2 py-1 rounded-md flex items-center gap-1 font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                isToolActive('services', 'fire_station')
-                  ? 'bg-orange-600 text-white font-bold ring-1 ring-orange-300'
-                  : isLight
-                  ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
-                  : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
-              }`}
-            >
-              <Flame className="w-3 h-3 text-orange-400" />
-              <span>Fire ($10k)</span>
-            </button>
-
-            {/* Police */}
-            <button
-              type="button"
-              onClick={() => selectTool({ category: 'services', serviceType: 'police_station' })}
-              className={`px-2 py-1 rounded-md flex items-center gap-1 font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                isToolActive('services', 'police_station')
-                  ? 'bg-blue-600 text-white font-bold ring-1 ring-blue-300'
-                  : isLight
-                  ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
-                  : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
-              }`}
-            >
-              <Shield className="w-3 h-3 text-blue-400" />
-              <span>Police ($11k)</span>
-            </button>
-
-            {/* Wind */}
-            <button
-              type="button"
-              onClick={() => selectTool({ category: 'utilities', serviceType: 'wind_turbine' })}
-              className={`px-2 py-1 rounded-md flex items-center gap-1 font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                isToolActive('utilities', 'wind_turbine')
-                  ? 'bg-yellow-600 text-white font-bold ring-1 ring-yellow-300'
-                  : isLight
-                  ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
-                  : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
-              }`}
-            >
-              <Zap className="w-3 h-3 text-yellow-400" />
-              <span>Wind ($6k)</span>
-            </button>
-
-            {/* Solar */}
-            <button
-              type="button"
-              onClick={() => selectTool({ category: 'utilities', serviceType: 'solar_farm' })}
-              className={`px-2 py-1 rounded-md flex items-center gap-1 font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                isToolActive('utilities', 'solar_farm')
-                  ? 'bg-yellow-600 text-white font-bold ring-1 ring-yellow-300'
-                  : isLight
-                  ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
-                  : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
-              }`}
-            >
-              <Sun className="w-3 h-3 text-yellow-300" />
-              <span>Solar ($14k)</span>
-            </button>
-
-            {/* Water Tower */}
-            <button
-              type="button"
-              onClick={() => selectTool({ category: 'utilities', serviceType: 'water_tower' })}
-              className={`px-2 py-1 rounded-md flex items-center gap-1 font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                isToolActive('utilities', 'water_tower')
-                  ? 'bg-sky-600 text-white font-bold ring-1 ring-sky-300'
-                  : isLight
-                  ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
-                  : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
-              }`}
-            >
-              <Droplets className="w-3 h-3 text-sky-400" />
-              <span>Water ($4.5k)</span>
-            </button>
-
-            {/* Park */}
-            <button
-              type="button"
-              onClick={() => selectTool({ category: 'services', serviceType: 'small_park' })}
-              className={`px-2 py-1 rounded-md flex items-center gap-1 font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                isToolActive('services', 'small_park')
-                  ? 'bg-emerald-600 text-white font-bold ring-1 ring-emerald-300'
-                  : isLight
-                  ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
-                  : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
-              }`}
-            >
-              <Trees className="w-3 h-3 text-emerald-400" />
-              <span>Park ($3k)</span>
+              <Briefcase className="w-3.5 h-3.5 text-blue-400" />
+              <span>Office</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* Main Unified Dock: Minimalist, Crisp, Undistracted */}
+      {/* Sub-Ribbon: Civic & Utilities */}
+      {isBuildMode && isCivicOrUtilityActive && (
+        <div
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border shadow-2xl text-xs backdrop-blur-xl animate-in slide-in-from-bottom-2 duration-200 overflow-x-auto max-w-[96vw] scrollbar-none ${
+            isLight
+              ? 'bg-white/95 border-neutral-200 text-neutral-800 shadow-neutral-200/50'
+              : 'bg-neutral-950/95 border-neutral-800 text-white shadow-black/80'
+          }`}
+        >
+          <span className="font-bold flex items-center gap-1.5 shrink-0 px-1 text-emerald-500">
+            <Building2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Civic & Power:</span>
+          </span>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => selectTool({ category: 'services', serviceType: 'clinic' })}
+              className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                isToolActive('services', 'clinic')
+                  ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30 ring-2 ring-rose-300 scale-105'
+                  : isLight
+                  ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                  : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+              }`}
+            >
+              <HeartPulse className="w-3.5 h-3.5 text-rose-400" />
+              <span>Clinic ($8k)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => selectTool({ category: 'services', serviceType: 'hospital' })}
+              className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                isToolActive('services', 'hospital')
+                  ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30 ring-2 ring-rose-300 scale-105'
+                  : isLight
+                  ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                  : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+              }`}
+            >
+              <Hospital className="w-3.5 h-3.5 text-rose-300" />
+              <span>Hospital ($28k)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => selectTool({ category: 'services', serviceType: 'elementary_school' })}
+              className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                isToolActive('services', 'elementary_school')
+                  ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30 ring-2 ring-amber-300 scale-105'
+                  : isLight
+                  ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                  : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+              }`}
+            >
+              <School className="w-3.5 h-3.5 text-amber-400" />
+              <span>School ($12k)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => selectTool({ category: 'services', serviceType: 'university' })}
+              className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                isToolActive('services', 'university')
+                  ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30 ring-2 ring-amber-300 scale-105'
+                  : isLight
+                  ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                  : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+              }`}
+            >
+              <GraduationCap className="w-3.5 h-3.5 text-amber-300" />
+              <span>University ($45k)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => selectTool({ category: 'services', serviceType: 'fire_station' })}
+              className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                isToolActive('services', 'fire_station')
+                  ? 'bg-orange-600 text-white shadow-md shadow-orange-600/30 ring-2 ring-orange-300 scale-105'
+                  : isLight
+                  ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                  : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+              }`}
+            >
+              <Flame className="w-3.5 h-3.5 text-orange-400" />
+              <span>Fire ($10k)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => selectTool({ category: 'services', serviceType: 'police_station' })}
+              className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                isToolActive('services', 'police_station')
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 ring-2 ring-blue-300 scale-105'
+                  : isLight
+                  ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                  : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+              }`}
+            >
+              <Shield className="w-3.5 h-3.5 text-blue-400" />
+              <span>Police ($11k)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => selectTool({ category: 'utilities', serviceType: 'wind_turbine' })}
+              className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                isToolActive('utilities', 'wind_turbine')
+                  ? 'bg-yellow-600 text-white shadow-md shadow-yellow-600/30 ring-2 ring-yellow-300 scale-105'
+                  : isLight
+                  ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                  : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5 text-yellow-400" />
+              <span>Wind ($6k)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => selectTool({ category: 'utilities', serviceType: 'solar_farm' })}
+              className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                isToolActive('utilities', 'solar_farm')
+                  ? 'bg-yellow-600 text-white shadow-md shadow-yellow-600/30 ring-2 ring-yellow-300 scale-105'
+                  : isLight
+                  ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                  : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+              }`}
+            >
+              <Sun className="w-3.5 h-3.5 text-yellow-300" />
+              <span>Solar ($14k)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => selectTool({ category: 'utilities', serviceType: 'water_tower' })}
+              className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                isToolActive('utilities', 'water_tower')
+                  ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30 ring-2 ring-sky-300 scale-105'
+                  : isLight
+                  ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                  : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+              }`}
+            >
+              <Droplets className="w-3.5 h-3.5 text-sky-400" />
+              <span>Water ($4.5k)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => selectTool({ category: 'services', serviceType: 'small_park' })}
+              className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                isToolActive('services', 'small_park')
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-300 scale-105'
+                  : isLight
+                  ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                  : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+              }`}
+            >
+              <Trees className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Park ($3k)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => selectTool({ category: 'services', serviceType: 'parking_lot' })}
+              className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                isToolActive('services', 'parking_lot')
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 ring-2 ring-indigo-300 scale-105'
+                  : isLight
+                  ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                  : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+              }`}
+            >
+              <Car className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Parking ($1.5k)</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Glassmorphic Dock */}
       <div
-        className={`flex items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-2xl border shadow-2xl backdrop-blur-md transition-all ${
+        className={`flex items-center gap-1.5 sm:gap-2 p-2 sm:p-2.5 rounded-3xl border shadow-2xl backdrop-blur-2xl transition-all ${
           isLight
-            ? 'bg-white/95 border-neutral-200 text-neutral-900 shadow-xl'
-            : 'bg-black/92 border-neutral-800/80 text-white'
+            ? 'bg-white/95 border-neutral-200/90 text-neutral-900 shadow-neutral-300/60'
+            : 'bg-neutral-950/92 border-neutral-800/80 text-white shadow-black/90'
         }`}
       >
         {/* Build / Pan Mode Toggle */}
         <button
           type="button"
           onClick={onToggleBuildMode}
-          title={isBuildMode ? 'Switch to Pan Mode (Move camera without building)' : 'Switch to Build Mode'}
-          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+          title={isBuildMode ? 'Switch to Pan Mode' : 'Switch to Build Mode'}
+          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
             isBuildMode
-              ? 'bg-emerald-600 text-white shadow-sm'
+              ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 ring-2 ring-emerald-400/40'
               : isLight
-              ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border border-neutral-250'
+              ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border border-neutral-300'
               : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-200 border border-neutral-800'
           }`}
         >
-          {isBuildMode ? <Hammer className="w-3.5 h-3.5" /> : <Hand className="w-3.5 h-3.5" />}
+          {isBuildMode ? <Hammer className="w-4 h-4" /> : <Hand className="w-4 h-4" />}
           <span className="hidden xs:inline">{isBuildMode ? 'Build' : 'Pan'}</span>
         </button>
 
-        <div className={`h-5 w-px ${isLight ? 'bg-neutral-250' : 'bg-neutral-800'}`} />
+        <div className={`h-6 w-px ${isLight ? 'bg-neutral-300' : 'bg-neutral-800'}`} />
 
         {/* Primary Tool Categories */}
-        <div className="flex items-center gap-0.5 sm:gap-1">
+        <div className="flex items-center gap-1 sm:gap-1.5">
           {/* Inspect */}
           <button
             type="button"
@@ -445,17 +529,17 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               soundEngine.playSelect();
             }}
             title="Inspect Tile Details (I)"
-            className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl flex items-center gap-1 text-xs font-medium transition-all cursor-pointer ${
+            className={`px-3 py-2 rounded-2xl flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
               activeTool.category === 'inspect'
                 ? isLight
-                  ? 'bg-neutral-200 text-neutral-900 font-bold'
-                  : 'bg-neutral-800 text-white font-bold'
+                  ? 'bg-neutral-250 text-neutral-900 shadow-md ring-2 ring-neutral-400/50'
+                  : 'bg-neutral-800 text-white shadow-md ring-2 ring-neutral-600/50'
                 : isLight
                 ? 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
                 : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
             }`}
           >
-            <Search className="w-3.5 h-3.5" />
+            <Search className="w-4 h-4" />
             <span className="hidden md:inline">Inspect</span>
           </button>
 
@@ -464,103 +548,49 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
             type="button"
             onClick={() => selectTool({ category: 'roads', roadType: 'two_lane' })}
             title="Roads & Corridors (R)"
-            className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl flex items-center gap-1 text-xs font-medium transition-all cursor-pointer ${
+            className={`px-3 py-2 rounded-2xl flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
               activeTool.category === 'roads'
-                ? 'bg-emerald-600 text-white font-bold shadow-xs'
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 ring-2 ring-emerald-400/40'
                 : isLight
                 ? 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
                 : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
             }`}
           >
-            <Route className="w-3.5 h-3.5" />
+            <Route className="w-4 h-4" />
             <span className="hidden sm:inline">Roads</span>
           </button>
 
           {/* Zones */}
-          <div className="flex items-center gap-0.5">
-            {/* Residential */}
-            <button
-              type="button"
-              onClick={() => selectTool({ category: 'zones', zoneType: 'residential' })}
-              title="Residential Zone (Homes)"
-              className={`p-1.5 sm:px-2 sm:py-1.5 rounded-xl flex items-center gap-1 text-xs font-medium transition-all cursor-pointer ${
-                isToolActive('zones', 'residential')
-                  ? 'bg-emerald-600 text-white font-bold shadow-xs'
-                  : isLight
-                  ? 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-                  : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
-              }`}
-            >
-              <Home className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden lg:inline">Home</span>
-            </button>
-
-            {/* Commercial */}
-            <button
-              type="button"
-              onClick={() => selectTool({ category: 'zones', zoneType: 'commercial' })}
-              title="Commercial Zone (Shops & Dining)"
-              className={`p-1.5 sm:px-2 sm:py-1.5 rounded-xl flex items-center gap-1 text-xs font-medium transition-all cursor-pointer ${
-                isToolActive('zones', 'commercial')
-                  ? 'bg-sky-600 text-white font-bold shadow-xs'
-                  : isLight
-                  ? 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-                  : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
-              }`}
-            >
-              <ShoppingBag className="w-3.5 h-3.5 text-sky-400" />
-              <span className="hidden lg:inline">Shop</span>
-            </button>
-
-            {/* Industrial */}
-            <button
-              type="button"
-              onClick={() => selectTool({ category: 'zones', zoneType: 'industrial' })}
-              title="Industrial Zone (Manufacturing)"
-              className={`p-1.5 sm:px-2 sm:py-1.5 rounded-xl flex items-center gap-1 text-xs font-medium transition-all cursor-pointer ${
-                isToolActive('zones', 'industrial')
-                  ? 'bg-amber-600 text-white font-bold shadow-xs'
-                  : isLight
-                  ? 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-                  : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
-              }`}
-            >
-              <Factory className="w-3.5 h-3.5 text-amber-400" />
-              <span className="hidden lg:inline">Industry</span>
-            </button>
-
-            {/* Office */}
-            <button
-              type="button"
-              onClick={() => selectTool({ category: 'zones', zoneType: 'office' })}
-              title="Office Zone (High-tech & Finance)"
-              className={`p-1.5 sm:px-2 sm:py-1.5 rounded-xl flex items-center gap-1 text-xs font-medium transition-all cursor-pointer ${
-                isToolActive('zones', 'office')
-                  ? 'bg-blue-600 text-white font-bold shadow-xs'
-                  : isLight
-                  ? 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
-                  : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
-              }`}
-            >
-              <Briefcase className="w-3.5 h-3.5 text-blue-400" />
-              <span className="hidden lg:inline">Office</span>
-            </button>
-          </div>
-
-          {/* Civic & Utilities Tab */}
           <button
             type="button"
-            onClick={() => selectTool({ category: 'services', serviceType: 'clinic' })}
-            title="Civic & Municipal Utilities (Clinics, Schools, Power, Water)"
-            className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl flex items-center gap-1 text-xs font-medium transition-all cursor-pointer ${
-              isCivicOrUtilityActive
-                ? 'bg-emerald-600 text-white font-bold shadow-xs'
+            onClick={() => selectTool({ category: 'zones', zoneType: 'residential' })}
+            title="Zoning (Residential, Commercial, Industrial, Office)"
+            className={`px-3 py-2 rounded-2xl flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
+              activeTool.category === 'zones'
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 ring-2 ring-emerald-400/40'
                 : isLight
                 ? 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
                 : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
             }`}
           >
-            <Building2 className="w-3.5 h-3.5" />
+            <Home className="w-4 h-4 text-emerald-400" />
+            <span className="hidden sm:inline">Zones</span>
+          </button>
+
+          {/* Civic & Utilities */}
+          <button
+            type="button"
+            onClick={() => selectTool({ category: 'services', serviceType: 'clinic' })}
+            title="Civic & Municipal Utilities (Clinics, Schools, Power, Water, Parks, Parking)"
+            className={`px-3 py-2 rounded-2xl flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
+              isCivicOrUtilityActive
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 ring-2 ring-emerald-400/40'
+                : isLight
+                ? 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
+                : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
             <span className="hidden sm:inline">Civic & Power</span>
           </button>
 
@@ -569,22 +599,22 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
             type="button"
             onClick={() => selectTool({ category: 'bulldoze' })}
             title="Demolish Building or Road (B)"
-            className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl flex items-center gap-1 text-xs font-medium transition-all cursor-pointer ${
+            className={`px-3 py-2 rounded-2xl flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
               activeTool.category === 'bulldoze'
-                ? 'bg-rose-600 text-white font-bold shadow-xs'
+                ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30 ring-2 ring-rose-400/40'
                 : isLight
                 ? 'text-rose-600 hover:bg-rose-50'
                 : 'text-rose-400 hover:bg-neutral-900'
             }`}
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="w-4 h-4" />
             <span className="hidden md:inline">Demolish</span>
           </button>
         </div>
 
-        <div className={`h-5 w-px ${isLight ? 'bg-neutral-250' : 'bg-neutral-800'}`} />
+        <div className={`h-6 w-px ${isLight ? 'bg-neutral-300' : 'bg-neutral-800'}`} />
 
-        {/* Compact Placement Mode Toggle (Safe Mode vs Rapid) */}
+        {/* Placement Mode Toggle */}
         {isBuildMode && (
           <button
             type="button"
@@ -595,47 +625,47 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
             }}
             title={
               placementMode === 'confirm'
-                ? 'Safe Mode: Tap tile to select, then check box. Click to switch to Rapid.'
-                : 'Rapid Place: Instant placement on click. Click to switch to Safe.'
+                ? 'Safe Mode: Tap tile to preview & confirm. Click to switch to Rapid.'
+                : 'Rapid Mode: Instant placement on click. Click to switch to Safe.'
             }
-            className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap border ${
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap border shadow-sm ${
               placementMode === 'confirm'
                 ? isLight
                   ? 'bg-sky-50 text-sky-700 border-sky-300'
                   : 'bg-sky-950/60 text-sky-400 border-sky-500/40'
-                : 'bg-amber-500 text-black font-bold border-amber-400'
+                : 'bg-amber-500 text-black font-extrabold border-amber-400 shadow-amber-500/30'
             }`}
           >
             <span>{placementMode === 'confirm' ? '✓ Safe' : '⚡ Rapid'}</span>
           </button>
         )}
 
-        {/* Selected Tile Confirm Checkbox Button (In Safe Confirm Mode) */}
+        {/* Selected Tile Confirm Button */}
         {isBuildMode && placementMode === 'confirm' && selectedCoord && onBuildOnSelected && (
           <button
             type="button"
             onClick={onBuildOnSelected}
-            title={`Confirm and place ${getToolDisplayName()} at [${selectedCoord.x}, ${selectedCoord.z}]`}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] shadow-lg animate-pulse transition-all cursor-pointer whitespace-nowrap"
+            title={`Confirm and place at [${selectedCoord.x}, ${selectedCoord.z}]`}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/40 animate-pulse transition-all cursor-pointer whitespace-nowrap"
           >
-            <CheckCircle2 className="w-3.5 h-3.5" />
+            <CheckCircle2 className="w-4 h-4" />
             <span>Place</span>
           </button>
         )}
 
-        {/* Collapse button in Undistracted Mode */}
+        {/* Collapse button in Zen mode */}
         {undistractedMode && (
           <button
             type="button"
             onClick={() => setIsDockCollapsed(true)}
             title="Minimize Toolbar (Zen View)"
-            className={`p-1 rounded-lg transition-colors cursor-pointer ${
+            className={`p-2 rounded-xl transition-colors cursor-pointer ${
               isLight
                 ? 'text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100'
                 : 'text-neutral-500 hover:text-white hover:bg-neutral-900'
             }`}
           >
-            <ChevronDown className="w-3.5 h-3.5" />
+            <ChevronDown className="w-4 h-4" />
           </button>
         )}
       </div>
