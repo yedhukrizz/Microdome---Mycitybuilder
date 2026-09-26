@@ -667,6 +667,36 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
                 <Car className="w-3.5 h-3.5 text-indigo-400" />
                 <span>Parking ($1.5k)</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => selectTool({ category: 'services', serviceType: 'bus_station' })}
+                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                  isToolActive('services', 'bus_station')
+                    ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30 ring-2 ring-sky-300 scale-105'
+                    : isLight
+                    ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                    : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+                }`}
+              >
+                <Route className="w-3.5 h-3.5 text-sky-400" />
+                <span>Bus Station ($5k)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => selectTool({ category: 'services', serviceType: 'forest' })}
+                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                  isToolActive('services', 'forest')
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-300 scale-105'
+                    : isLight
+                    ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                    : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+                }`}
+              >
+                <Trees className="w-3.5 h-3.5 text-emerald-300" />
+                <span>Forest ($2k)</span>
+              </button>
             </div>
           </div>
         )}

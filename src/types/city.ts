@@ -25,7 +25,9 @@ export type ServiceType =
   | 'small_park'
   | 'large_park'
   | 'stadium'
-  | 'parking_lot';
+  | 'parking_lot'
+  | 'bus_station'
+  | 'forest';
 
 export type ToolCategory = 'inspect' | 'roads' | 'zones' | 'buildings' | 'utilities' | 'services' | 'bulldoze';
 
@@ -36,7 +38,7 @@ export type ActiveTool =
   | { category: 'zones'; zoneType: ZoneType | 'dezone' }
   | { category: 'buildings'; buildingType: DirectBuildingType; zone: ZoneType; level: number }
   | { category: 'utilities'; serviceType: 'wind_turbine' | 'solar_farm' | 'coal_plant' | 'water_tower' | 'sewage_plant' }
-  | { category: 'services'; serviceType: 'clinic' | 'hospital' | 'fire_station' | 'police_station' | 'elementary_school' | 'university' | 'small_park' | 'large_park' | 'stadium' | 'parking_lot' };
+  | { category: 'services'; serviceType: 'clinic' | 'hospital' | 'fire_station' | 'police_station' | 'elementary_school' | 'university' | 'small_park' | 'large_park' | 'stadium' | 'parking_lot' | 'bus_station' | 'forest' };
 
 export type OverlayMode = 'none' | 'electricity' | 'water' | 'land_value' | 'pollution' | 'traffic';
 
@@ -49,6 +51,8 @@ export interface RoadData {
     west: boolean;
   };
   trafficDensity: number; // 0 to 1
+  hasTrafficLight?: boolean;
+  congestionLevel?: number;
   isHighwayGateway?: boolean; // Regional external highway connection
   gatewayDirection?: 'inbound' | 'outbound' | 'bidirectional';
 }

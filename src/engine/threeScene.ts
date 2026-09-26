@@ -226,78 +226,63 @@ export class ThreeSceneManager {
 
   private createProceduralTexture(type: 'asphalt' | 'brick' | 'roof' | 'concrete' | 'windowGrid'): THREE.CanvasTexture {
     const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 256;
+    canvas.width = 128;
+    canvas.height = 128;
     const ctx = canvas.getContext('2d');
     if (ctx) {
       if (type === 'asphalt') {
         ctx.fillStyle = '#475569';
-        ctx.fillRect(0, 0, 256, 256);
-        for (let i = 0; i < 4000; i++) {
-          const x = Math.random() * 256;
-          const y = Math.random() * 256;
-          ctx.fillStyle = Math.random() > 0.5 ? '#1e293b' : '#94a3b8';
-          ctx.fillRect(x, y, 1.5, 1.5);
+        ctx.fillRect(0, 0, 128, 128);
+        for (let i = 0; i < 1500; i++) {
+          const x = Math.random() * 128;
+          const y = Math.random() * 128;
+          ctx.fillStyle = Math.random() > 0.5 ? '#334155' : '#64748b';
+          ctx.fillRect(x, y, 1, 1);
         }
       } else if (type === 'brick') {
-        ctx.fillStyle = '#b45309';
-        ctx.fillRect(0, 0, 256, 256);
-        ctx.strokeStyle = '#78350f';
-        ctx.lineWidth = 3;
-        for (let y = 0; y <= 256; y += 16) {
-          ctx.beginPath();
-          ctx.moveTo(0, y);
-          ctx.lineTo(256, y);
-          ctx.stroke();
-        }
-        for (let y = 0; y < 256; y += 16) {
-          const offset = (y / 16) % 2 === 0 ? 0 : 16;
-          for (let x = offset; x <= 256; x += 32) {
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.lineTo(x, y + 16);
-            ctx.stroke();
-          }
+        ctx.fillStyle = '#9a3412';
+        ctx.fillRect(0, 0, 128, 128);
+        ctx.fillStyle = '#7c2d12';
+        for (let y = 0; y < 128; y += 16) {
+          ctx.fillRect(0, y, 128, 2);
         }
       } else if (type === 'roof') {
         ctx.fillStyle = '#78716c';
-        ctx.fillRect(0, 0, 256, 256);
-        ctx.fillStyle = '#292524';
-        for (let x = 0; x < 256; x += 12) {
-          ctx.fillRect(x, 0, 5, 256);
+        ctx.fillRect(0, 0, 128, 128);
+        ctx.fillStyle = '#44403c';
+        for (let x = 0; x < 128; x += 16) {
+          ctx.fillRect(x, 0, 3, 128);
         }
       } else if (type === 'concrete') {
         ctx.fillStyle = '#cbd5e1';
-        ctx.fillRect(0, 0, 256, 256);
-        for (let i = 0; i < 2500; i++) {
-          const x = Math.random() * 256;
-          const y = Math.random() * 256;
-          ctx.fillStyle = Math.random() > 0.5 ? '#94a3b8' : '#f1f5f9';
-          ctx.fillRect(x, y, 2, 2);
+        ctx.fillRect(0, 0, 128, 128);
+        for (let i = 0; i < 1000; i++) {
+          const x = Math.random() * 128;
+          const y = Math.random() * 128;
+          ctx.fillStyle = Math.random() > 0.5 ? '#94a3b8' : '#e2e8f0';
+          ctx.fillRect(x, y, 1.5, 1.5);
         }
       } else if (type === 'windowGrid') {
-        ctx.fillStyle = '#312e81';
-        ctx.fillRect(0, 0, 256, 256);
-        ctx.strokeStyle = '#818cf8';
-        ctx.lineWidth = 3;
-        for (let x = 32; x < 256; x += 32) {
-          ctx.beginPath();
-          ctx.moveTo(x, 0);
-          ctx.lineTo(x, 256);
-          ctx.stroke();
+        const grad = ctx.createLinearGradient(0, 0, 0, 128);
+        grad.addColorStop(0, '#1e1b4b');
+        grad.addColorStop(0.5, '#312e81');
+        grad.addColorStop(1, '#1e1b4b');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 128, 128);
+        
+        ctx.fillStyle = 'rgba(129, 140, 248, 0.25)';
+        for (let x = 16; x < 128; x += 32) {
+          ctx.fillRect(x, 0, 2, 128);
         }
-        for (let y = 32; y < 256; y += 32) {
-          ctx.beginPath();
-          ctx.moveTo(0, y);
-          ctx.lineTo(256, y);
-          ctx.stroke();
+        for (let y = 16; y < 128; y += 32) {
+          ctx.fillRect(0, y, 128, 2);
         }
       }
     }
     const texture = new THREE.CanvasTexture(canvas);
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(3, 3);
+    texture.repeat.set(2, 2);
     return texture;
   }
 
@@ -314,10 +299,10 @@ export class ThreeSceneManager {
     this.sharedGeos.headlight = new THREE.SphereGeometry(0.035, 4, 4);
     this.sharedGeos.taillight = new THREE.BoxGeometry(0.04, 0.03, 0.01);
 
-    // Pedestrian Shared Geometries
-    this.sharedGeos.pedHead = new THREE.SphereGeometry(0.045, 6, 6);
-    this.sharedGeos.pedBody = new THREE.BoxGeometry(0.08, 0.09, 0.06);
-    this.sharedGeos.pedLegs = new THREE.BoxGeometry(0.07, 0.07, 0.05);
+    // Pedestrian Shared Geometries (Scaled down for realistic proportions)
+    this.sharedGeos.pedHead = new THREE.SphereGeometry(0.03, 6, 6);
+    this.sharedGeos.pedBody = new THREE.BoxGeometry(0.05, 0.06, 0.04);
+    this.sharedGeos.pedLegs = new THREE.BoxGeometry(0.04, 0.045, 0.035);
 
     // Shared Building Geometries
     this.sharedGeos.cube1 = new THREE.BoxGeometry(0.72, 0.75, 0.72);
@@ -341,17 +326,11 @@ export class ThreeSceneManager {
     // Pastel Clean Road Materials
     this.materials.asphalt = new THREE.MeshStandardMaterial({
       color: 0x505d6e,
-      roughness: 0.8,
-      map: asphaltTex,
-      bumpMap: asphaltTex,
-      bumpScale: 0.02,
+      roughness: 0.85,
     });
     this.materials.highwayAsphalt = new THREE.MeshStandardMaterial({
       color: 0x414d5e,
-      roughness: 0.75,
-      map: asphaltTex,
-      bumpMap: asphaltTex,
-      bumpScale: 0.02,
+      roughness: 0.8,
     });
     this.materials.roadLine = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
     this.materials.crosswalk = new THREE.MeshBasicMaterial({ color: 0xffffff });
@@ -359,9 +338,6 @@ export class ThreeSceneManager {
     this.materials.sidewalk = new THREE.MeshStandardMaterial({
       color: 0xe2e8f0,
       roughness: 0.9,
-      map: concreteTex,
-      bumpMap: concreteTex,
-      bumpScale: 0.015,
     });
     this.materials.curb = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.9 });
 
@@ -558,20 +534,20 @@ export class ThreeSceneManager {
 
       // Legs / Pants
       const legs = new THREE.Mesh(this.sharedGeos.pedLegs, this.materials.pedPants);
-      legs.position.y = 0.035;
+      legs.position.y = 0.022;
       legs.castShadow = true;
       pGroup.add(legs);
 
       // Shirt / Torso
       const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.7 });
       const body = new THREE.Mesh(this.sharedGeos.pedBody, bodyMat);
-      body.position.y = 0.105;
+      body.position.y = 0.068;
       body.castShadow = true;
       pGroup.add(body);
 
       // Head
       const head = new THREE.Mesh(this.sharedGeos.pedHead, this.materials.pedSkin);
-      head.position.y = 0.18;
+      head.position.y = 0.115;
       head.castShadow = true;
       pGroup.add(head);
 
@@ -815,52 +791,24 @@ export class ThreeSceneManager {
       roadGroup.add(isoArm);
     }
 
-    // 4. Continuous Road Markings
+    // 4. Clean Single Road Centerline (No side-by-side hatching)
     const lineMat = isHwy ? this.materials.highwayYellow : this.materials.roadLine;
     const isStraightNS = (conn.north || conn.south) && !conn.east && !conn.west;
     const isStraightEW = (conn.east || conn.west) && !conn.north && !conn.south;
     const numConnections = (conn.north ? 1 : 0) + (conn.south ? 1 : 0) + (conn.east ? 1 : 0) + (conn.west ? 1 : 0);
 
     if (isStraightNS || !hasAnyConn) {
-      for (const zOffset of [-0.3, 0, 0.3]) {
-        const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.032, 0.18), lineMat);
-        stripe.position.set(0, 0.005, zOffset);
-        roadGroup.add(stripe);
-      }
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.004, 0.6), lineMat);
+      stripe.position.set(0, 0.02, 0);
+      roadGroup.add(stripe);
     } else if (isStraightEW) {
-      for (const xOffset of [-0.3, 0, 0.3]) {
-        const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.032, 0.04), lineMat);
-        stripe.position.set(xOffset, 0.005, 0);
-        roadGroup.add(stripe);
-      }
-    } else if (numConnections >= 3) {
-      // Intersection (T-Junction or 4-Way Crossroad): add cute chalk-white pedestrian zebra crosswalks!
-      const addZebra = (dx: number, dz: number, rotY: number) => {
-        const zebraGroup = new THREE.Group();
-        zebraGroup.position.set(dx, 0.006, dz);
-        zebraGroup.rotation.y = rotY;
-        for (let i = -2; i <= 2; i++) {
-          const bar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.031, 0.025), this.materials.crosswalk);
-          bar.position.set(0, 0, i * 0.06);
-          zebraGroup.add(bar);
-        }
-        roadGroup.add(zebraGroup);
-      };
-
-      if (conn.north) addZebra(0, -0.36, 0);
-      if (conn.south) addZebra(0, 0.36, 0);
-      if (conn.east) addZebra(0.36, 0, Math.PI / 2);
-      if (conn.west) addZebra(-0.36, 0, Math.PI / 2);
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.004, 0.03), lineMat);
+      stripe.position.set(0, 0.02, 0);
+      roadGroup.add(stripe);
     } else if (numConnections === 2) {
-      const bendGeo = new THREE.RingGeometry(0.16, 0.20, 8, 1, 0, Math.PI / 2);
-      bendGeo.rotateX(-Math.PI / 2);
-      const bend = new THREE.Mesh(bendGeo, lineMat);
-      bend.position.y = 0.02;
-      if (conn.north && conn.east) bend.rotation.y = Math.PI;
-      else if (conn.north && conn.west) bend.rotation.y = Math.PI / 2;
-      else if (conn.south && conn.east) bend.rotation.y = -Math.PI / 2;
-      else if (conn.south && conn.west) bend.rotation.y = 0;
-      roadGroup.add(bend);
+      const curveStripe = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.004, 0.4), lineMat);
+      curveStripe.position.set(0, 0.02, 0);
+      roadGroup.add(curveStripe);
     }
 
     // 5. Bridge Piers & Railings if spanning river
@@ -945,6 +893,9 @@ export class ThreeSceneManager {
 
     const actualHeight = Math.max(0.65, b.height);
 
+    // Add Level 100 Super Detailed Base Walkway, Bushes, Tree, and Pathway Lights
+    this.createBuildingBaseEnvironment(group, b.zone);
+
     if (b.zone === 'residential') {
       this.createCuteResidentialMesh(b, actualHeight, group);
     } else if (b.zone === 'commercial') {
@@ -959,6 +910,67 @@ export class ThreeSceneManager {
     this.addBuildingUpgradeTop(b, actualHeight, group);
 
     this.buildingGroup.add(group);
+  }
+
+  private createBuildingBaseEnvironment(group: THREE.Group, zone: string) {
+    // 1. Half-tile pedestrian walkway / alleyway pad (extending along front & side, leaving the other half open)
+    const walkMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.85 });
+    const pebbleMat = new THREE.MeshStandardMaterial({ color: 0xc8b6a6, roughness: 0.9 });
+    
+    // Front alleyway concrete strip
+    const frontWalk = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.02, 0.35), walkMat);
+    frontWalk.position.set(0, 0.01, 0.28);
+    frontWalk.receiveShadow = true;
+    group.add(frontWalk);
+
+    // Side pebble / aggregate walkway strip between building edges
+    const sidePebble = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.022, 0.45), pebbleMat);
+    sidePebble.position.set(-0.28, 0.012, -0.02);
+    sidePebble.receiveShadow = true;
+    group.add(sidePebble);
+
+    // 2. Small Bushes along the alleyway
+    const bushMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.8 });
+    const bushGeo = new THREE.SphereGeometry(0.05, 5, 5);
+    
+    const b1 = new THREE.Mesh(bushGeo, bushMat);
+    b1.position.set(-0.35, 0.04, 0.42);
+    group.add(b1);
+
+    const b2 = new THREE.Mesh(bushGeo, bushMat);
+    b2.position.set(0.35, 0.04, 0.42);
+    group.add(b2);
+
+    // 3. Small Tree in the alleyway recess
+    const trunkGeo = new THREE.CylinderGeometry(0.012, 0.015, 0.22, 4);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9 });
+    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+    trunk.position.set(-0.32, 0.11, -0.25);
+    group.add(trunk);
+
+    const foliageGeo = new THREE.ConeGeometry(0.1, 0.26, 5);
+    const foliageMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.75 });
+    const foliage = new THREE.Mesh(foliageGeo, foliageMat);
+    foliage.position.set(-0.32, 0.28, -0.25);
+    group.add(foliage);
+
+    // 4. Small Pathway Lights (Bollard Lamps) along the alleyway path
+    const lampPostGeo = new THREE.CylinderGeometry(0.006, 0.006, 0.1, 4);
+    const lampMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.7 });
+    const bulbMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: 0xfde047,
+      emissiveIntensity: 0.8,
+    });
+    this.streetLightMaterials.push(bulbMat);
+
+    const lampPost = new THREE.Mesh(lampPostGeo, lampMat);
+    lampPost.position.set(0.28, 0.05, 0.42);
+    group.add(lampPost);
+
+    const lampBulb = new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 6), bulbMat);
+    lampBulb.position.set(0.28, 0.10, 0.42);
+    group.add(lampBulb);
   }
 
   // Citizen figures that gather in parks
@@ -2338,6 +2350,120 @@ export class ThreeSceneManager {
         group.add(this.createParkCitizen(0.08, 0.02, 0.32, 0x10b981, true));
 
         this.addGeometricWindows(group, mainW, mainH, mainD, 3, false);
+        break;
+      }
+
+      case 'parking_lot': {
+        // High-Quality Multi-Level 3D Parking Garage & Deck Structure
+        const pW = 0.82;
+        const pH1 = 0.35;
+        const pH2 = 0.35;
+        const pD = 0.82;
+
+        const deck1 = new THREE.Mesh(new THREE.BoxGeometry(pW, pH1, pD), this.materials.indSlate);
+        deck1.position.set(0, pH1 / 2, 0);
+        deck1.castShadow = true;
+        group.add(deck1);
+
+        const deck2 = new THREE.Mesh(new THREE.BoxGeometry(pW * 0.95, pH2, pD * 0.95), this.materials.indSlate);
+        deck2.position.set(0, pH1 + pH2 / 2, 0);
+        deck2.castShadow = true;
+        group.add(deck2);
+
+        for (const px of [-pW / 2 + 0.08, pW / 2 - 0.08]) {
+          for (const pz of [-pD / 2 + 0.08, pD / 2 - 0.08]) {
+            const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, pH1 + pH2, 6), this.materials.indPipe);
+            pillar.position.set(px, (pH1 + pH2) / 2, pz);
+            group.add(pillar);
+          }
+        }
+
+        const gateBooth = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.20, 0.18), this.materials.comPeach);
+        gateBooth.position.set(0.25, 0.10, pD / 2 - 0.04);
+        group.add(gateBooth);
+
+        const barrierArm = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.03, 0.03), this.materials.indCautionYellow);
+        barrierArm.position.set(0.05, 0.18, pD / 2 - 0.04);
+        group.add(barrierArm);
+
+        for (const [cx, cz] of [[-0.2, -0.2], [0.2, -0.2], [-0.2, 0.2], [0.2, 0.2]]) {
+          const carMini = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.09, 0.24), new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.3 }));
+          carMini.position.set(cx, pH1 + pH2 + 0.045, cz);
+          group.add(carMini);
+        }
+
+        const signPost = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.35, 4), this.materials.indPipe);
+        signPost.position.set(0, pH1 + pH2 + 0.18, -0.28);
+        const signBoard = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.03), new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.2 }));
+        signBoard.position.set(0, pH1 + pH2 + 0.32, -0.28);
+        group.add(signPost);
+        group.add(signBoard);
+        break;
+      }
+
+      case 'bus_station': {
+        const bsBase = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.04, 0.86), this.materials.sidewalk);
+        bsBase.position.y = 0.02;
+        group.add(bsBase);
+
+        const shelterRoof = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.04, 0.38), new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.2 }));
+        shelterRoof.position.set(0, 0.35, 0);
+        group.add(shelterRoof);
+
+        for (const px of [-0.28, 0.28]) {
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.35, 4), this.materials.indPipe);
+          post.position.set(px, 0.175, 0.16);
+          group.add(post);
+        }
+
+        const scheduleBoard = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.20, 0.03), this.materials.indSlate);
+        scheduleBoard.position.set(0, 0.20, -0.22);
+        group.add(scheduleBoard);
+
+        const parkedBus = new THREE.Group();
+        parkedBus.position.set(0.24, 0, 0.28);
+        const busBody = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.52), new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.3 }));
+        busBody.position.y = 0.13;
+        parkedBus.add(busBody);
+        const busWin = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.10, 0.44), this.materials.comGlass);
+        busWin.position.set(0, 0.18, 0);
+        parkedBus.add(busWin);
+        group.add(parkedBus);
+
+        group.add(this.createParkCitizen(-0.15, 0.04, 0.05, 0x3b82f6, true));
+        group.add(this.createParkCitizen(0.10, 0.04, 0.05, 0x10b981, true));
+        break;
+      }
+
+      case 'forest': {
+        const forestBase = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.04, 0.96), this.materials.grass);
+        forestBase.position.y = 0.02;
+        group.add(forestBase);
+
+        for (let i = 0; i < 7; i++) {
+          const angle = (i / 7) * Math.PI * 2 + (s.styleSeed % 3);
+          const dist = 0.22 + (i % 3) * 0.08;
+          const fx = Math.cos(angle) * dist;
+          const fz = Math.sin(angle) * dist;
+
+          const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.32, 5), this.materials.resDarkWood);
+          trunk.position.set(fx, 0.18, fz);
+          trunk.castShadow = true;
+          group.add(trunk);
+
+          const isPine = i % 2 === 0;
+          if (isPine) {
+            const foliage = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.42, 6), this.materials.resPlanter);
+            foliage.position.set(fx, 0.46, fz);
+            foliage.castShadow = true;
+            group.add(foliage);
+          } else {
+            const foliage = new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 6), this.materials.resSage);
+            foliage.position.set(fx, 0.42, fz);
+            foliage.castShadow = true;
+            group.add(foliage);
+          }
+        }
         break;
       }
 

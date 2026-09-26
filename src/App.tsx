@@ -504,6 +504,26 @@ function MainGame() {
     showToast(`Bond of $${amount.toLocaleString()} received!`);
   };
 
+  const handleExpandMap = (direction: 'south' | 'east' | 'west') => {
+    const city = cityManagerRef.current;
+    if (!city) return;
+    if (city.budget.treasury < 40000) {
+      showToast('Insufficient funds for map expansion ($40,000 required)');
+      return;
+    }
+    city.budget.treasury -= 40000;
+    city.budget.expensesPerWeek += 200;
+    city.expandMap(direction);
+    if (threeSceneRef.current) {
+      threeSceneRef.current.buildTerrain();
+      threeSceneRef.current.buildFoliage();
+      threeSceneRef.current.rebuildCityScene();
+    }
+    setBudget({ ...city.budget });
+    soundEngine.playCoin();
+    showToast(`City map boundaries successfully expanded to the ${direction} by +12 tiles!`);
+  };
+
   const handleStartNewGame = (preset: 'starter' | 'busy' | 'delta') => {
     pendingActionRef.current = preset;
     setViewMode('game');
@@ -864,6 +884,7 @@ function MainGame() {
           stats={stats}
           onUpdateTaxRate={handleUpdateTaxRate}
           onTakeBond={handleTakeBond}
+          onExpandMap={handleExpandMap}
           onClose={() => setActiveModal(null)}
         />
       )}

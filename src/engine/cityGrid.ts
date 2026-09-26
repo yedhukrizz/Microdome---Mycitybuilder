@@ -104,6 +104,8 @@ export const TOOL_COSTS: Record<string, number> = {
   large_park: 10000,
   stadium: 65000,
   parking_lot: 1500,
+  bus_station: 5000,
+  forest: 2000,
 };
 
 export const SERVICE_MAINTENANCE: Record<ServiceType, number> = {
@@ -122,6 +124,8 @@ export const SERVICE_MAINTENANCE: Record<ServiceType, number> = {
   large_park: 160,
   stadium: 1200,
   parking_lot: 20,
+  bus_station: 120,
+  forest: 30,
 };
 
 export class CityManager {
@@ -830,6 +834,14 @@ export class CityManager {
       case 'stadium':
         radius = 20;
         effectValue = 70;
+        break;
+      case 'bus_station':
+        radius = 14;
+        effectValue = 40;
+        break;
+      case 'forest':
+        radius = 10;
+        effectValue = 45;
         break;
     }
 
@@ -1612,7 +1624,7 @@ export class CityManager {
     }
   }
 
-  // Shortest path on the connected road network using ultra-fast typed-array BFS (0 allocations)
+  // Quickest route on the connected road network using Dijkstra's algorithm factoring in road speed limits and live traffic congestion
   public findRoadPath(startX: number, startZ: number, targetX: number, targetZ: number): [number, number][] | null {
     if (startX === targetX && startZ === targetZ) {
       return [[startX, startZ]];
@@ -1627,75 +1639,64 @@ export class CityManager {
     const startIdx = startX * GRID_SIZE + startZ;
     const targetIdx = targetX * GRID_SIZE + targetZ;
 
-    this.bfsToken = ((this.bfsToken + 1) & 0xffff) || 1;
-    const token = this.bfsToken;
-    const visited = this.bfsVisited;
-    const parent = this.bfsParent;
-    const queue = this.bfsQueue;
+    const numCells = GRID_SIZE * GRID_SIZE;
+    const dist = new Float32Array(numCells);
+    dist.fill(Infinity);
+    const parent = new Int32Array(numCells);
+    parent.fill(-1);
+    const visited = new Uint8Array(numCells);
 
-    let head = 0;
-    let tail = 0;
-    queue[tail++] = startIdx;
-    visited[startIdx] = token;
-    parent[startIdx] = -1;
+    dist[startIdx] = 0;
 
-    let reached = false;
-
-    while (head < tail) {
-      const currIdx = queue[head++];
-      if (currIdx === targetIdx) {
-        reached = true;
-        break;
+    for (let i = 0; i < numCells; i++) {
+      let minDist = Infinity;
+      let uIdx = -1;
+      for (let j = 0; j < numCells; j++) {
+        if (!visited[j] && dist[j] < minDist) {
+          minDist = dist[j];
+          uIdx = j;
+        }
       }
 
-      const cx = (currIdx / GRID_SIZE) | 0;
-      const cz = currIdx % GRID_SIZE;
+      if (uIdx === -1 || minDist === Infinity) break;
+      if (uIdx === targetIdx) break;
+
+      visited[uIdx] = 1;
+      const cx = (uIdx / GRID_SIZE) | 0;
+      const cz = uIdx % GRID_SIZE;
       const currentCell = this.grid[cx][cz];
       if (!currentCell.road) continue;
 
       const conn = currentCell.road.connections;
+      const neighbors: [number, number, number, boolean][] = [
+        [cx, cz - 1, conn.north ? 1 : 0, cz > 0],
+        [cx, cz + 1, conn.south ? 1 : 0, cz < GRID_SIZE - 1],
+        [cx + 1, cz, conn.east ? 1 : 0, cx < GRID_SIZE - 1],
+        [cx - 1, cz, conn.west ? 1 : 0, cx > 0],
+      ];
 
-      // North: cz - 1
-      if (conn.north && cz > 0) {
-        const nIdx = currIdx - 1;
-        if (visited[nIdx] !== token && this.grid[cx][cz - 1].road) {
-          visited[nIdx] = token;
-          parent[nIdx] = currIdx;
-          queue[tail++] = nIdx;
-        }
-      }
-      // South: cz + 1
-      if (conn.south && cz < GRID_SIZE - 1) {
-        const nIdx = currIdx + 1;
-        if (visited[nIdx] !== token && this.grid[cx][cz + 1].road) {
-          visited[nIdx] = token;
-          parent[nIdx] = currIdx;
-          queue[tail++] = nIdx;
-        }
-      }
-      // East: cx + 1
-      if (conn.east && cx < GRID_SIZE - 1) {
-        const nIdx = currIdx + GRID_SIZE;
-        if (visited[nIdx] !== token && this.grid[cx + 1][cz].road) {
-          visited[nIdx] = token;
-          parent[nIdx] = currIdx;
-          queue[tail++] = nIdx;
-        }
-      }
-      // West: cx - 1
-      if (conn.west && cx > 0) {
-        const nIdx = currIdx - GRID_SIZE;
-        if (visited[nIdx] !== token && this.grid[cx - 1][cz].road) {
-          visited[nIdx] = token;
-          parent[nIdx] = currIdx;
-          queue[tail++] = nIdx;
+      for (const [nx, nz, isConn, valid] of neighbors) {
+        if (!valid || !isConn) continue;
+        const nCell = this.grid[nx][nz];
+        if (!nCell.road) continue;
+
+        const nIdx = nx * GRID_SIZE + nz;
+        if (visited[nIdx]) continue;
+
+        const speed = nCell.road.type === 'highway' ? 3.5 : nCell.road.type === 'avenue' ? 2.5 : 1.0;
+        const congestionPenalty = 1.0 + (nCell.road.congestionLevel || 0) * 0.02;
+        const weight = (1.0 / speed) * congestionPenalty;
+
+        const newDist = dist[uIdx] + weight;
+        if (newDist < dist[nIdx]) {
+          dist[nIdx] = newDist;
+          parent[nIdx] = uIdx;
         }
       }
     }
 
-    if (!reached) return null;
+    if (parent[targetIdx] === -1 && startIdx !== targetIdx) return null;
 
-    // Backtrack path into array of [x, z]
     const path: [number, number][] = [];
     let curr = targetIdx;
     while (curr !== -1) {
@@ -1882,7 +1883,7 @@ export class CityManager {
       routeIndex: 0,
       isBlocked: false,
       dwellTimer: 0,
-      laneOffset: 0.16, // Right-side driving!
+      laneOffset: 0.34, // Tucked to the sidewalk sidelines so center road is clear
     });
   }
 
@@ -1928,48 +1929,15 @@ export class CityManager {
 
       // 3. Realistic Car-Following & Traffic Jam / Traffic Block detection:
       // If a vehicle is directly ahead on the same road segment or destination, stop to prevent collision!
-      let carAheadDist = 999;
-      const curWorldX = v.x + (v.targetX - v.x) * v.progress;
-      const curWorldZ = v.z + (v.targetZ - v.z) * v.progress;
-
-      for (let j = 0; j < this.vehicles.length; j++) {
-        if (i === j) continue;
-        const other = this.vehicles[j];
-        if (other.dwellTimer && other.dwellTimer > 0) continue;
-
-        const otherWorldX = other.x + (other.targetX - other.x) * other.progress;
-        const otherWorldZ = other.z + (other.targetZ - other.z) * other.progress;
-        const dx = otherWorldX - curWorldX;
-        const dz = otherWorldZ - curWorldZ;
-        const dist = Math.hypot(dx, dz);
-
-        // Check if other car is in front of our vehicle's travel direction
-        const fwdX = Math.sin(v.rotation);
-        const fwdZ = Math.cos(v.rotation);
-        const forwardDot = dx * fwdX + dz * fwdZ;
-
-        if (dist < 0.65 && forwardDot > 0.05) {
-          if (dist < carAheadDist) carAheadDist = dist;
-        }
-      }
-
-      let speedMult = 1.0;
-      if (carAheadDist < 0.42) {
-        // Full stop behind the car ahead - TRAFFIC BLOCK!
-        v.isBlocked = true;
-        speedMult = 0.0;
-      } else if (carAheadDist < 0.70) {
-        // Slow down in congestion queue
-        v.isBlocked = false;
-        speedMult = 0.35;
-      } else {
-        v.isBlocked = false;
-      }
+      // Cars can overlap and go without waiting (no stopping for traffic lights or cars)
+      const speedMult = 1.0;
+      v.isBlocked = false;
+      v.blockedTimer = 0;
 
       // Increment road congestion on current tile
       const roadCell = this.getCell(v.x, v.z);
       if (roadCell?.road) {
-        roadCell.road.trafficDensity = Math.min(1.0, roadCell.road.trafficDensity + (v.isBlocked ? 0.35 : 0.15));
+        roadCell.road.trafficDensity = Math.min(1.0, roadCell.road.trafficDensity + 0.15);
       }
 
       // Advance car along the road
@@ -2185,6 +2153,54 @@ export class CityManager {
           this.pedestrians.splice(i, 1);
         }
       }
+    }
+  }
+
+  public expandMap(direction: 'south' | 'east' | 'west' = 'south') {
+    const oldSize = this.grid.length;
+    const expandBy = 12;
+    const newSize = oldSize + expandBy;
+    const newGrid: CellData[][] = [];
+
+    const offsetX = direction === 'west' ? expandBy : 0;
+    const offsetZ = 0;
+
+    for (let x = 0; x < newSize; x++) {
+      newGrid[x] = [];
+      for (let z = 0; z < newSize; z++) {
+        const oldX = x - offsetX;
+        const oldZ = z - offsetZ;
+        if (oldX >= 0 && oldX < oldSize && oldZ >= 0 && oldZ < oldSize) {
+          const cell = this.grid[oldX][oldZ];
+          cell.x = x;
+          cell.z = z;
+          newGrid[x][z] = cell;
+        } else {
+          const terrain = (x + z) % 11 === 0 ? 'water' : (x + z) % 8 === 0 ? 'sand' : 'grass';
+          newGrid[x][z] = {
+            x,
+            z,
+            terrain,
+            elevation: terrain === 'water' ? -0.2 : 0,
+            road: null,
+            zone: null,
+            building: null,
+            service: null,
+            hasPower: false,
+            hasWater: false,
+            pollution: 0,
+            landValue: 50,
+            fireCoverage: false,
+            policeCoverage: false,
+            healthCoverage: false,
+            educationCoverage: false,
+          };
+        }
+      }
+    }
+    this.grid = newGrid;
+    if (direction === 'west') {
+      this.highwayPortalCoord.x += expandBy;
     }
   }
 }
