@@ -227,6 +227,29 @@ export const TopBar: React.FC<TopBarProps> = ({
             </div>
           </button>
 
+          {/* Traffic Congestion Progress Bar */}
+          <div
+            className={`hidden md:flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] shrink-0 ${
+              isLight ? 'bg-neutral-100 border-neutral-250' : 'bg-neutral-900 border-neutral-800'
+            }`}
+            title={`Traffic Congestion Rate: ${stats.trafficCongestionRate}%`}
+          >
+            <span className="font-semibold text-neutral-400">Traffic:</span>
+            <div className="w-16 h-2 bg-neutral-700/50 rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all duration-300 ${
+                  stats.trafficCongestionRate > 70
+                    ? 'bg-rose-500'
+                    : stats.trafficCongestionRate > 40
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-500'
+                }`}
+                style={{ width: `${stats.trafficCongestionRate}%` }}
+              />
+            </div>
+            <span className="font-mono tabular-nums font-semibold">{stats.trafficCongestionRate}%</span>
+          </div>
+
           {/* Simulation Speed Control */}
           <div
             className={`flex items-center border rounded-md p-0.5 shrink-0 ${

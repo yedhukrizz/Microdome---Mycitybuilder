@@ -67,6 +67,33 @@ export const INITIAL_MILESTONES: Milestone[] = [
     description: 'A world-class metropolis! Unlocked Metropolitan Stadium & Highways.',
     unlockedFeatures: ['Metropolitan Stadium', 'Highway System'],
   },
+  {
+    id: 'm6',
+    name: 'Eco Capital',
+    populationRequired: 3500,
+    achieved: false,
+    rewardMoney: 450000,
+    description: 'A green paradise! Unlocked Nuclear & Geothermal Power, Recycling Centers, & Forests.',
+    unlockedFeatures: ['Nuclear Plant', 'Geothermal Plant', 'Recycling Center', 'Forests'],
+  },
+  {
+    id: 'm7',
+    name: 'Futuristic Megalopolis',
+    populationRequired: 7000,
+    achieved: false,
+    rewardMoney: 850000,
+    description: 'Advanced urban transit! Unlocked Subway Stations, Tram Depots, & Incinerators.',
+    unlockedFeatures: ['Subway Station', 'Tram Depot', 'Incinerator'],
+  },
+  {
+    id: 'm8',
+    name: 'Quantum Singularity City',
+    populationRequired: 15000,
+    achieved: false,
+    rewardMoney: 2000000,
+    description: 'The pinnacle of civilization! Unlocked Fusion Reactors & Desalination Mega-Plants.',
+    unlockedFeatures: ['Fusion Reactor', 'Desalination Plant'],
+  },
 ];
 
 export const TOOL_COSTS: Record<string, number> = {
@@ -91,9 +118,13 @@ export const TOOL_COSTS: Record<string, number> = {
   wind_turbine: 6000,
   solar_farm: 14000,
   coal_plant: 25000,
+  nuclear_plant: 80000,
+  geothermal_plant: 45000,
+  fusion_reactor: 250000,
   water_tower: 4500,
   sewage_plant: 9000,
-  // Services
+  desalination_plant: 35000,
+  // Services & Transit
   clinic: 8000,
   hospital: 28000,
   fire_station: 10000,
@@ -105,6 +136,10 @@ export const TOOL_COSTS: Record<string, number> = {
   stadium: 65000,
   parking_lot: 1500,
   bus_station: 5000,
+  subway_station: 30000,
+  tram_depot: 20000,
+  recycling_center: 15000,
+  incinerator: 22000,
   forest: 2000,
 };
 
@@ -112,8 +147,14 @@ export const SERVICE_MAINTENANCE: Record<ServiceType, number> = {
   wind_turbine: 80,
   solar_farm: 180,
   coal_plant: 450,
+  nuclear_plant: 850,
+  geothermal_plant: 350,
+  fusion_reactor: 2200,
   water_tower: 60,
   sewage_plant: 150,
+  desalination_plant: 400,
+  recycling_center: 180,
+  incinerator: 300,
   clinic: 200,
   hospital: 750,
   fire_station: 250,
@@ -125,6 +166,8 @@ export const SERVICE_MAINTENANCE: Record<ServiceType, number> = {
   stadium: 1200,
   parking_lot: 20,
   bus_station: 120,
+  subway_station: 450,
+  tram_depot: 250,
   forest: 30,
 };
 
@@ -155,6 +198,7 @@ export class CityManager {
     year: 2026,
     totalCarsOnRoad: 0,
     highwayCommuters: 0,
+    trafficCongestionRate: 0,
 
     // Algorithmic Education
     educationLevel: 45,
@@ -791,6 +835,21 @@ export class CityManager {
         powerOutput = 160;
         radius = 16;
         break;
+      case 'nuclear_plant':
+        powerOutput = 800;
+        radius = 22;
+        effectValue = 60;
+        break;
+      case 'geothermal_plant':
+        powerOutput = 350;
+        radius = 16;
+        effectValue = 40;
+        break;
+      case 'fusion_reactor':
+        powerOutput = 2500;
+        radius = 30;
+        effectValue = 90;
+        break;
       case 'water_tower':
         waterOutput = 10000;
         radius = 10;
@@ -798,6 +857,27 @@ export class CityManager {
       case 'sewage_plant':
         waterOutput = 20000;
         radius = 14;
+        break;
+      case 'desalination_plant':
+        waterOutput = 50000;
+        radius = 20;
+        effectValue = 50;
+        break;
+      case 'recycling_center':
+        radius = 14;
+        effectValue = 35;
+        break;
+      case 'incinerator':
+        radius = 16;
+        effectValue = 35;
+        break;
+      case 'subway_station':
+        radius = 20;
+        effectValue = 60;
+        break;
+      case 'tram_depot':
+        radius = 16;
+        effectValue = 50;
         break;
       case 'clinic':
         radius = 8;
@@ -1375,6 +1455,20 @@ export class CityManager {
     const avgHap = buildingCount > 0 ? Math.round(totalHappiness / buildingCount) : 75;
     this.stats.cityHappiness = Math.min(100, Math.max(10, Math.round(avgHap + econHappinessBonus)));
     this.stats.totalCarsOnRoad = this.vehicles.length;
+
+    let totalRoads = 0;
+    let transitBonus = 0;
+    for (let rx = 0; rx < GRID_SIZE; rx++) {
+      for (let rz = 0; rz < GRID_SIZE; rz++) {
+        const rc = this.grid[rx][rz];
+        if (rc.road) totalRoads++;
+        if (rc.service && (rc.service.type === 'subway_station' || rc.service.type === 'tram_depot' || rc.service.type === 'bus_station' || rc.service.type === 'parking_lot')) {
+          transitBonus += 15;
+        }
+      }
+    }
+    const baseCongestion = totalRoads > 0 ? Math.min(100, Math.round((this.vehicles.length / (totalRoads * 0.75)) * 40)) : 0;
+    this.stats.trafficCongestionRate = Math.max(5, Math.min(100, baseCongestion - transitBonus));
   }
 
   private handleBuildingGrowthAndDecay() {

@@ -2406,32 +2406,37 @@ export class ThreeSceneManager {
         bsBase.position.y = 0.02;
         group.add(bsBase);
 
-        const shelterRoof = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.04, 0.38), new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.2 }));
-        shelterRoof.position.set(0, 0.35, 0);
+        const shelterRoof = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.04, 0.42), new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.2 }));
+        shelterRoof.position.set(0, 0.36, 0);
         group.add(shelterRoof);
 
-        for (const px of [-0.28, 0.28]) {
-          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.35, 4), this.materials.indPipe);
-          post.position.set(px, 0.175, 0.16);
+        for (const px of [-0.30, 0.30]) {
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.36, 4), this.materials.indPipe);
+          post.position.set(px, 0.18, 0.18);
           group.add(post);
         }
 
-        const scheduleBoard = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.20, 0.03), this.materials.indSlate);
-        scheduleBoard.position.set(0, 0.20, -0.22);
+        const scheduleBoard = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.22, 0.03), this.materials.indSlate);
+        scheduleBoard.position.set(0, 0.20, -0.24);
         group.add(scheduleBoard);
 
-        const parkedBus = new THREE.Group();
-        parkedBus.position.set(0.24, 0, 0.28);
-        const busBody = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.52), new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.3 }));
-        busBody.position.y = 0.13;
-        parkedBus.add(busBody);
-        const busWin = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.10, 0.44), this.materials.comGlass);
-        busWin.position.set(0, 0.18, 0);
-        parkedBus.add(busWin);
-        group.add(parkedBus);
+        const transitBus = new THREE.Group();
+        transitBus.position.set(0.24, 0, 0.28);
+        const bBody = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.58), new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.3 }));
+        bBody.position.y = 0.14;
+        transitBus.add(bBody);
+        const bWin = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.12, 0.50), this.materials.comGlass);
+        bWin.position.set(0, 0.19, 0);
+        transitBus.add(bWin);
+        group.add(transitBus);
 
-        group.add(this.createParkCitizen(-0.15, 0.04, 0.05, 0x3b82f6, true));
-        group.add(this.createParkCitizen(0.10, 0.04, 0.05, 0x10b981, true));
+        // 6 waiting passengers under the bus shelter
+        group.add(this.createParkCitizen(-0.18, 0.04, -0.05, 0x3b82f6, true));
+        group.add(this.createParkCitizen(-0.06, 0.04, -0.05, 0xec4899, true));
+        group.add(this.createParkCitizen(0.06, 0.04, -0.05, 0x10b981, true));
+        group.add(this.createParkCitizen(0.18, 0.04, -0.05, 0xf59e0b, true));
+        group.add(this.createParkCitizen(-0.12, 0.04, 0.10, 0x8b5cf6, false));
+        group.add(this.createParkCitizen(0.12, 0.04, 0.10, 0x06b6d4, false));
         break;
       }
 
@@ -2464,6 +2469,84 @@ export class ThreeSceneManager {
             group.add(foliage);
           }
         }
+        break;
+      }
+
+      case 'nuclear_plant': {
+        const nW = 0.84; const nD = 0.84;
+        const base = new THREE.Mesh(new THREE.BoxGeometry(nW, 0.12, nD), this.materials.indSlate);
+        base.position.y = 0.06; group.add(base);
+        const dome = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.4 }));
+        dome.position.set(-0.16, 0.12, 0); group.add(dome);
+        for (const tz of [-0.22, 0.22]) {
+          const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 0.55, 8), new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.5 }));
+          tower.position.set(0.24, 0.275, tz); group.add(tower);
+        }
+        break;
+      }
+      case 'geothermal_plant': {
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.10, 0.82), this.materials.indSlate);
+        base.position.y = 0.05; group.add(base);
+        for (const px of [-0.2, 0.2]) {
+          const turbine = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.35, 8), this.materials.indPipe);
+          turbine.position.set(px, 0.25, 0); group.add(turbine);
+        }
+        const pipe = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.06), this.materials.indPipe);
+        pipe.position.set(0, 0.32, 0); group.add(pipe);
+        break;
+      }
+      case 'fusion_reactor': {
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.12, 0.88), new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8 }));
+        base.position.y = 0.06; group.add(base);
+        const torus = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.09, 12, 24), new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.8, metalness: 0.9 }));
+        torus.rotation.x = Math.PI / 2;
+        torus.position.set(0, 0.38, 0); group.add(torus);
+        break;
+      }
+      case 'desalination_plant': {
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.10, 0.84), this.materials.indSlate);
+        base.position.y = 0.05; group.add(base);
+        for (const pz of [-0.2, 0.2]) {
+          const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.35, 10), this.materials.water);
+          tank.rotation.z = Math.PI / 2;
+          tank.position.set(0, 0.22, pz); group.add(tank);
+        }
+        break;
+      }
+      case 'recycling_center': {
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.08, 0.84), this.materials.sidewalk);
+        base.position.y = 0.04; group.add(base);
+        const shed = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.32, 0.5), new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.3 }));
+        shed.position.set(0, 0.20, 0); group.add(shed);
+        const bin = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.14, 0.18), new THREE.MeshStandardMaterial({ color: 0x047857 }));
+        bin.position.set(0.25, 0.11, 0.25); group.add(bin);
+        break;
+      }
+      case 'incinerator': {
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.12, 0.84), this.materials.indSlate);
+        base.position.y = 0.06; group.add(base);
+        const furnace = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.4, 0.45), this.materials.indBrick);
+        furnace.position.set(0, 0.26, 0); group.add(furnace);
+        const smokestack = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.11, 0.75, 8), this.materials.indPipe);
+        smokestack.position.set(0.2, 0.55, 0.2); group.add(smokestack);
+        break;
+      }
+      case 'subway_station': {
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.04, 0.86), this.materials.sidewalk);
+        base.position.y = 0.02; group.add(base);
+        const kiosk = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.26, 0.4), new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3 }));
+        kiosk.position.set(0, 0.15, 0); group.add(kiosk);
+        const sign = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.1, 0.04), new THREE.MeshBasicMaterial({ color: 0xdc2626 }));
+        sign.position.set(0, 0.32, 0.2); group.add(sign);
+        break;
+      }
+      case 'tram_depot': {
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.04, 0.86), this.materials.sidewalk);
+        base.position.y = 0.02; group.add(base);
+        const shed = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 0.6), this.materials.comTeal);
+        shed.position.set(0, 0.17, 0); group.add(shed);
+        const tram = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.48), new THREE.MeshStandardMaterial({ color: 0x8b5cf6, roughness: 0.3 }));
+        tram.position.set(0.22, 0.11, 0); group.add(tram);
         break;
       }
 

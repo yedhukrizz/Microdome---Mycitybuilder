@@ -53,6 +53,7 @@ function MainGame() {
     year: 2026,
     totalCarsOnRoad: 0,
     highwayCommuters: 0,
+    trafficCongestionRate: 0,
     educationLevel: 45,
     uneducatedRate: 35,
     highSchoolRate: 50,

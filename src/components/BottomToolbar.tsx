@@ -685,17 +685,122 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
 
               <button
                 type="button"
-                onClick={() => selectTool({ category: 'services', serviceType: 'forest' })}
+                onClick={() => selectTool({ category: 'utilities', serviceType: 'nuclear_plant' })}
                 className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
-                  isToolActive('services', 'forest')
+                  isToolActive('utilities', 'nuclear_plant')
                     ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-300 scale-105'
                     : isLight
                     ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
                     : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
                 }`}
               >
-                <Trees className="w-3.5 h-3.5 text-emerald-300" />
-                <span>Forest ($2k)</span>
+                <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Nuclear ($80k)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => selectTool({ category: 'utilities', serviceType: 'geothermal_plant' })}
+                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                  isToolActive('utilities', 'geothermal_plant')
+                    ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30 ring-2 ring-amber-300 scale-105'
+                    : isLight
+                    ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                    : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <span>Geothermal ($45k)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => selectTool({ category: 'utilities', serviceType: 'fusion_reactor' })}
+                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                  isToolActive('utilities', 'fusion_reactor')
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 ring-2 ring-blue-300 scale-105'
+                    : isLight
+                    ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                    : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5 text-blue-400" />
+                <span>Fusion ($250k)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => selectTool({ category: 'utilities', serviceType: 'desalination_plant' })}
+                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                  isToolActive('utilities', 'desalination_plant')
+                    ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30 ring-2 ring-sky-300 scale-105'
+                    : isLight
+                    ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                    : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+                }`}
+              >
+                <Droplets className="w-3.5 h-3.5 text-sky-400" />
+                <span>Desalination ($35k)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => selectTool({ category: 'services', serviceType: 'recycling_center' })}
+                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                  isToolActive('services', 'recycling_center')
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-300 scale-105'
+                    : isLight
+                    ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                    : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+                }`}
+              >
+                <Trash2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Recycling ($15k)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => selectTool({ category: 'services', serviceType: 'incinerator' })}
+                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                  isToolActive('services', 'incinerator')
+                    ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30 ring-2 ring-amber-300 scale-105'
+                    : isLight
+                    ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                    : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+                }`}
+              >
+                <Flame className="w-3.5 h-3.5 text-amber-400" />
+                <span>Incinerator ($22k)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => selectTool({ category: 'services', serviceType: 'subway_station' })}
+                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                  isToolActive('services', 'subway_station')
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 ring-2 ring-indigo-300 scale-105'
+                    : isLight
+                    ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                    : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+                }`}
+              >
+                <Route className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Subway ($30k)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => selectTool({ category: 'services', serviceType: 'tram_depot' })}
+                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                  isToolActive('services', 'tram_depot')
+                    ? 'bg-violet-600 text-white shadow-md shadow-violet-600/30 ring-2 ring-violet-300 scale-105'
+                    : isLight
+                    ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                    : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+                }`}
+              >
+                <Car className="w-3.5 h-3.5 text-violet-400" />
+                <span>Tram ($20k)</span>
               </button>
             </div>
           </div>
