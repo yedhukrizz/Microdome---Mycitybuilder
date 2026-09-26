@@ -29,7 +29,7 @@ import {
 } from './types/city';
 
 function MainGame() {
-  const { theme, undistractedMode, toggleUndistractedMode, contactShadows } = useTheme();
+  const { theme, undistractedMode, toggleUndistractedMode, contactShadows, graphicsQuality } = useTheme();
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const cityManagerRef = useRef<CityManager | null>(null);
   const threeSceneRef = useRef<ThreeSceneManager | null>(null);
@@ -224,12 +224,18 @@ function MainGame() {
     };
   }, []);
 
-  // Sync contact shadows
+  // Sync contact shadows & graphics quality
   useEffect(() => {
     if (threeSceneRef.current) {
       threeSceneRef.current.setContactShadows(contactShadows);
     }
   }, [contactShadows]);
+
+  useEffect(() => {
+    if (threeSceneRef.current) {
+      threeSceneRef.current.setGraphicsQuality(graphicsQuality);
+    }
+  }, [graphicsQuality]);
 
   // Sync build mode to ThreeSceneManager
   useEffect(() => {

@@ -296,7 +296,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </span>
               </div>
               <div className={`flex rounded-lg p-0.5 border ${isLight ? 'bg-neutral-200 border-neutral-300' : 'bg-neutral-900 border-neutral-800'}`}>
-                {(['high', 'balanced', 'performance'] as const).map((q) => (
+                {(['ultra', 'high', 'balanced', 'low'] as const).map((q) => (
                   <button
                     key={q}
                     type="button"

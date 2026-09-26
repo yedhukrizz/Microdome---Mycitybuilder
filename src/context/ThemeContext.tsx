@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export type UITheme = 'black' | 'light';
-export type GraphicsQuality = 'high' | 'balanced' | 'performance';
+export type GraphicsQuality = 'ultra' | 'high' | 'balanced' | 'low';
 
 interface ThemeContextType {
   theme: UITheme;
@@ -49,7 +49,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [graphicsQuality, setGraphicsQualityState] = useState<GraphicsQuality>(() => {
     try {
       const saved = localStorage.getItem('skyline_graphics_quality');
-      if (saved === 'high' || saved === 'balanced' || saved === 'performance') return saved;
+      if (saved === 'ultra' || saved === 'high' || saved === 'balanced' || saved === 'low') return saved;
+      if (saved === 'performance') return 'low';
     } catch {}
     return 'high';
   });

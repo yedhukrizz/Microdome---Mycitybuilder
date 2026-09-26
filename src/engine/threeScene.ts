@@ -106,19 +106,31 @@ export class ThreeSceneManager {
     this.camera = new THREE.PerspectiveCamera(45, aspect, 0.5, 300);
     this.updateCameraTransform();
 
-    // 3. Renderer with high performance & shadows
+    // 3. Renderer with high performance & shadows optimized for mobile/MediaTek GPUs
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
       powerPreference: 'high-performance',
       precision: 'mediump',
+      stencil: false,
+      depth: true,
     });
     this.renderer.setSize(container.clientWidth, container.clientHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.8));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.35));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.10;
     container.appendChild(this.renderer.domElement);
+
+    // Prevent graphic glitches and handle context loss on mobile / MediaTek devices
+    this.renderer.domElement.addEventListener('webglcontextlost', (event) => {
+      event.preventDefault();
+      console.warn('WebGL context lost. Attempting recovery...');
+    }, false);
+
+    this.renderer.domElement.addEventListener('webglcontextrestored', () => {
+      console.info('WebGL context restored.');
+    }, false);
 
     // 4. Warm Soft Isometric Lights
     this.ambientLight = new THREE.AmbientLight(0xfffdf7, 0.82);
@@ -3078,7 +3090,50 @@ export class ThreeSceneManager {
 
   public setContactShadows(enabled: boolean) {
     this.renderer.shadowMap.enabled = enabled;
-    this.sunLight.castShadow = enabled;
+    if (this.sunLight) {
+      this.sunLight.castShadow = enabled;
+    }
+  }
+
+  public setGraphicsQuality(quality: 'ultra' | 'high' | 'balanced' | 'low') {
+    if (!this.renderer) return;
+    if (quality === 'ultra') {
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.5));
+      this.renderer.shadowMap.enabled = true;
+      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      if (this.sunLight) {
+        this.sunLight.castShadow = true;
+        this.sunLight.shadow.mapSize.width = 2048;
+        this.sunLight.shadow.mapSize.height = 2048;
+        this.sunLight.shadow.map?.dispose();
+        this.sunLight.shadow.map = null;
+      }
+    } else if (quality === 'high') {
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.8));
+      this.renderer.shadowMap.enabled = true;
+      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      if (this.sunLight) {
+        this.sunLight.castShadow = true;
+        this.sunLight.shadow.mapSize.width = 1024;
+        this.sunLight.shadow.mapSize.height = 1024;
+      }
+    } else if (quality === 'balanced') {
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.35));
+      this.renderer.shadowMap.enabled = true;
+      this.renderer.shadowMap.type = THREE.PCFShadowMap;
+      if (this.sunLight) {
+        this.sunLight.castShadow = true;
+        this.sunLight.shadow.mapSize.width = 1024;
+        this.sunLight.shadow.mapSize.height = 1024;
+      }
+    } else {
+      // Low (Performance / MediaTek optimization)
+      this.renderer.setPixelRatio(1.0);
+      this.renderer.shadowMap.enabled = false;
+      if (this.sunLight) {
+        this.sunLight.castShadow = false;
+      }
+    }
   }
 
   public resetCamera() {
