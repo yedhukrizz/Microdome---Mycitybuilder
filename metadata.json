@@ -1,0 +1,6 @@
+{
+  "name": "Skyline Architect: 3D City Builder",
+  "description": "An addictive Three.js 3D city building simulation with intuitive zoning, road grids, utilities, citizen simulation, and dynamic day-night cycles.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
