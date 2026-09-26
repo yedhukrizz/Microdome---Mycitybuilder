@@ -118,7 +118,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
 
   if (undistractedMode && isDockCollapsed) {
     return (
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 select-none animate-in fade-in duration-200">
+      <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 select-none animate-in fade-in duration-200 px-4">
         <button
           type="button"
           onClick={() => setIsDockCollapsed(false)}
@@ -137,7 +137,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   }
 
   return (
-    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-2 select-none max-w-[98vw]">
+    <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 select-none w-full px-3 max-w-[100vw] overflow-x-auto pb-safe">
       {/* Sub-Ribbon: Roads & Corridors */}
       {isBuildMode && isRoadsActive && (
         <div
