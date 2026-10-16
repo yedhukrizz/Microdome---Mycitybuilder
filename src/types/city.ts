@@ -1,6 +1,6 @@
 export type ZoneType = 'residential' | 'commercial' | 'industrial' | 'office';
 
-export type RoadType = 'two_lane' | 'avenue' | 'highway';
+export type RoadType = 'two_lane' | 'avenue' | 'highway' | 'mud' | 'rural' | 'pavement' | 'pedestrian' | 'toll_booth';
 
 export type DirectBuildingType =
   | 'home_suburban'
@@ -29,7 +29,9 @@ export type ServiceType =
   | 'elementary_school'
   | 'university'
   | 'small_park'
+  | 'medium_park'
   | 'large_park'
+  | 'grand_park'
   | 'stadium'
   | 'parking_lot'
   | 'bus_station'
@@ -46,7 +48,7 @@ export type ActiveTool =
   | { category: 'zones'; zoneType: ZoneType | 'dezone' }
   | { category: 'buildings'; buildingType: DirectBuildingType; zone: ZoneType; level: number }
   | { category: 'utilities'; serviceType: 'wind_turbine' | 'solar_farm' | 'coal_plant' | 'nuclear_plant' | 'geothermal_plant' | 'fusion_reactor' | 'water_tower' | 'sewage_plant' | 'desalination_plant' }
-  | { category: 'services'; serviceType: 'clinic' | 'hospital' | 'fire_station' | 'police_station' | 'elementary_school' | 'university' | 'small_park' | 'large_park' | 'stadium' | 'parking_lot' | 'bus_station' | 'subway_station' | 'tram_depot' | 'recycling_center' | 'incinerator' | 'forest' };
+  | { category: 'services'; serviceType: 'clinic' | 'hospital' | 'fire_station' | 'police_station' | 'elementary_school' | 'university' | 'small_park' | 'medium_park' | 'large_park' | 'grand_park' | 'stadium' | 'parking_lot' | 'bus_station' | 'subway_station' | 'tram_depot' | 'recycling_center' | 'incinerator' | 'forest' };
 
 export type OverlayMode = 'none' | 'electricity' | 'water' | 'land_value' | 'pollution' | 'traffic';
 
@@ -120,6 +122,7 @@ export interface CellData {
   policeCoverage: boolean;
   healthCoverage: boolean;
   educationCoverage: boolean;
+  hasTree?: boolean;
 }
 
 export type VehicleTripState =

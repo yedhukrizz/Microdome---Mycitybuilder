@@ -101,6 +101,11 @@ export const TOOL_COSTS: Record<string, number> = {
   road_two_lane: 20,
   road_avenue: 50,
   road_highway: 100,
+  road_mud: 10,
+  road_rural: 15,
+  road_pavement: 30,
+  road_pedestrian: 25,
+  road_toll_booth: 150,
   // Zones
   zone_residential: 10,
   zone_commercial: 10,
@@ -132,7 +137,9 @@ export const TOOL_COSTS: Record<string, number> = {
   elementary_school: 12000,
   university: 45000,
   small_park: 3000,
+  medium_park: 6000,
   large_park: 10000,
+  grand_park: 20000,
   stadium: 65000,
   parking_lot: 1500,
   bus_station: 5000,
@@ -162,7 +169,9 @@ export const SERVICE_MAINTENANCE: Record<ServiceType, number> = {
   elementary_school: 240,
   university: 900,
   small_park: 50,
+  medium_park: 90,
   large_park: 160,
+  grand_park: 300,
   stadium: 1200,
   parking_lot: 20,
   bus_station: 120,
@@ -797,6 +806,7 @@ export class CityManager {
     };
     cell.zone = null;
     cell.building = null;
+    cell.hasTree = false;
 
     if (recompute) {
       this.recalculateRoadConnections();
@@ -808,6 +818,7 @@ export class CityManager {
     const cell = this.getCell(x, z);
     if (!cell || cell.road || cell.service) return;
     cell.zone = zoneType;
+    cell.hasTree = false;
     if (recompute) {
       this.recomputeNetworksAndSimulation();
     }
@@ -907,9 +918,17 @@ export class CityManager {
         radius = 6;
         effectValue = 30;
         break;
+      case 'medium_park':
+        radius = 9;
+        effectValue = 40;
+        break;
       case 'large_park':
         radius = 12;
         effectValue = 50;
+        break;
+      case 'grand_park':
+        radius = 16;
+        effectValue = 65;
         break;
       case 'stadium':
         radius = 20;
@@ -939,6 +958,7 @@ export class CityManager {
     };
     cell.zone = null;
     cell.building = null;
+    cell.hasTree = false;
 
     if (recompute) {
       this.recomputeNetworksAndSimulation();
@@ -1045,6 +1065,7 @@ export class CityManager {
     };
 
     cell.building = building;
+    cell.hasTree = false;
     return building;
   }
 
@@ -1608,7 +1629,8 @@ export class CityManager {
       for (let z = 0; z < GRID_SIZE; z++) {
         const cell = this.grid[x][z];
         if (cell.road) {
-          expenses += cell.road.type === 'two_lane' ? 4 : cell.road.type === 'avenue' ? 10 : 25;
+          const rt = cell.road.type;
+          expenses += rt === 'two_lane' ? 4 : rt === 'avenue' ? 10 : rt === 'highway' ? 25 : rt === 'mud' ? 2 : rt === 'rural' ? 3 : rt === 'pavement' ? 6 : rt === 'pedestrian' ? 4 : rt === 'toll_booth' ? 35 : 4;
         }
         if (cell.service) {
           expenses += cell.service.maintenanceCost;
@@ -1777,7 +1799,8 @@ export class CityManager {
         const nIdx = nx * GRID_SIZE + nz;
         if (visited[nIdx]) continue;
 
-        const speed = nCell.road.type === 'highway' ? 3.5 : nCell.road.type === 'avenue' ? 2.5 : 1.0;
+        const rt = nCell.road.type;
+        const speed = rt === 'highway' ? 3.5 : rt === 'avenue' ? 2.5 : rt === 'pavement' ? 1.8 : rt === 'two_lane' ? 1.0 : rt === 'rural' ? 0.9 : rt === 'mud' ? 0.6 : rt === 'pedestrian' ? 0.4 : rt === 'toll_booth' ? 0.8 : 1.0;
         const congestionPenalty = 1.0 + (nCell.road.congestionLevel || 0) * 0.02;
         const weight = (1.0 / speed) * congestionPenalty;
 
@@ -2047,6 +2070,10 @@ export class CityManager {
         if (!currentCell?.road) {
           this.vehicles.splice(i, 1);
           continue;
+        }
+
+        if (currentCell.road.type === 'toll_booth') {
+          this.budget.treasury += 5; // Toll booth earnings!
         }
 
         // Highway exit reached

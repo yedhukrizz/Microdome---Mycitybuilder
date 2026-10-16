@@ -26,6 +26,8 @@ import {
   Check,
   ChevronRight,
   Flame,
+  Car,
+  Route,
 } from 'lucide-react';
 import { CityBudget, CityDemands, CityHistorySnapshot, CityStats } from '../types/city';
 import { useTheme } from '../context/ThemeContext';
@@ -664,6 +666,76 @@ export const CityOverviewModal: React.FC<CityOverviewModalProps> = ({
                         : 'Pumping stations maintain ample surplus (+ ' + waterMargin.toLocaleString() + ' m³/d) for expansion.'}
                     </span>
                   </div>
+                </div>
+              </div>
+
+              {/* Transportation & Transit Network Progress Bar Card */}
+              <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4 space-y-3 mt-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                      <Car className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-white text-xs">Metropolitan Transportation & Cab Fleet Network</div>
+                      <span className="text-[10px] text-slate-400">Traffic Congestion, Cabs, Buses, Trams & Subway Coverage</span>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md border bg-indigo-950/60 text-indigo-300 border-indigo-700/60">
+                    {stats.trafficCongestionRate > 50 ? 'HEAVY CONGESTION' : 'SMOOTH TRAFFIC FLOW'}
+                  </span>
+                </div>
+
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-400">Road Congestion & Fleet Load</span>
+                    <span className="font-mono font-bold text-white">
+                      {stats.totalCarsOnRoad} vehicles on road ({stats.trafficCongestionRate}% congestion)
+                    </span>
+                  </div>
+
+                  {/* Comparative Stacked Bar */}
+                  <div className="w-full h-5 bg-slate-900 border border-slate-800 rounded-lg p-0.5 relative overflow-hidden flex items-center">
+                    <div
+                      className={`h-full rounded transition-all duration-500 ${
+                        stats.trafficCongestionRate > 60 ? 'bg-rose-500' : 'bg-gradient-to-r from-indigo-500 to-sky-400'
+                      }`}
+                      style={{ width: `${Math.min(100, Math.max(10, stats.trafficCongestionRate))}%` }}
+                    />
+                    <div className="absolute right-0 top-0 bottom-0 w-0.5 bg-slate-600" />
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] text-slate-400">
+                    <span>Free Flow (0%)</span>
+                    <span>Moderate (50%)</span>
+                    <span className="text-indigo-300 font-mono font-bold">Gridlock Limit (100%)</span>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-800/80 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-lg p-2">
+                    <span className="text-slate-400 text-[10px]">Cab & Rideshare Fleet</span>
+                    <div className="font-mono font-bold text-white mt-0.5">Active & Ready</div>
+                  </div>
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-lg p-2">
+                    <span className="text-slate-400 text-[10px]">Bus Stations</span>
+                    <div className="font-mono font-bold text-sky-400 mt-0.5">Connected</div>
+                  </div>
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-lg p-2">
+                    <span className="text-slate-400 text-[10px]">Highway Commuters</span>
+                    <div className="font-mono font-bold text-amber-400 mt-0.5">{stats.highwayCommuters} /wk</div>
+                  </div>
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-lg p-2">
+                    <span className="text-slate-400 text-[10px]">Transit Coverage</span>
+                    <div className="font-mono font-bold text-emerald-400 mt-0.5">Optimal</div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/60 border border-slate-800/60 rounded-lg p-2 text-[10px] text-slate-300 flex items-center gap-2">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                  <span>
+                    💡 Best cabs, bus stations, tram depots, and subways reduce road congestion and accelerate citizen commuting speeds.
+                  </span>
                 </div>
               </div>
             </div>

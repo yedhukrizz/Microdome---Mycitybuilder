@@ -73,6 +73,14 @@ export const TopBar: React.FC<TopBarProps> = ({
     };
   }, [mobileMenuOpen]);
 
+  const getHappinessEmoji = (happiness: number) => {
+    if (happiness >= 80) return '🥳';
+    if (happiness >= 60) return '😊';
+    if (happiness >= 40) return '😐';
+    if (happiness >= 20) return '😟';
+    return '😭';
+  };
+
   const navItems = [
     { id: 'overview', label: 'Overview', icon: Building2, desc: 'Utilities & Needs' },
     { id: 'economy', label: 'Economy', icon: TrendingUp, desc: 'Budget & Taxes' },
@@ -193,7 +201,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               ${budget.treasury.toLocaleString()}
             </span>
             <span
-              className={`text-[9px] font-mono tabular-nums hidden sm:inline ${
+              className={`text-[9px] font-mono tabular-nums ${
                 netWeekly >= 0 ? (isLight ? 'text-emerald-600' : 'text-emerald-400') : 'text-rose-500'
               }`}
             >
@@ -201,26 +209,26 @@ export const TopBar: React.FC<TopBarProps> = ({
             </span>
           </div>
 
-          {/* Population & Happiness (Clickable for Analytics) */}
+          {/* Population & Happiness (Visible on all viewports including mobile) */}
           <button
             type="button"
             onClick={() => handleSelectNav('graphs')}
             title="Open Population & Analytics Graphs"
-            className={`hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[11px] transition-all cursor-pointer shrink-0 ${
+            className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[10px] sm:text-[11px] transition-all cursor-pointer shrink-0 ${
               isLight
                 ? 'bg-neutral-50 hover:bg-neutral-100 border-neutral-250 text-neutral-700 hover:text-neutral-900'
                 : 'bg-neutral-900/80 hover:bg-neutral-850 border-neutral-800 text-neutral-300 hover:text-white'
             }`}
           >
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-0.5">
               <Users className="w-3 h-3 text-sky-500" />
               <span className={`font-mono font-semibold tabular-nums ${isLight ? 'text-neutral-900' : 'text-white'}`}>
                 {stats.population.toLocaleString()}
               </span>
             </div>
             <span className={isLight ? 'text-neutral-300' : 'text-neutral-700'}>|</span>
-            <div className="flex items-center gap-1">
-              <Smile className="w-3 h-3 text-amber-500" />
+            <div className="flex items-center gap-0.5" title={`Happiness: ${stats.cityHappiness}%`}>
+              <span className="text-xs">{getHappinessEmoji(stats.cityHappiness)}</span>
               <span className="font-mono font-semibold tabular-nums text-emerald-500">
                 {stats.cityHappiness}%
               </span>

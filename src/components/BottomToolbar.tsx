@@ -335,7 +335,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'roads', roadType: 'two_lane' })}
-                className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2.5 py-1 rounded-md font-bold text-[11px] transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap text-xs ${
                   isToolActive('roads', 'two_lane')
                     ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-400/50 scale-105'
                     : isLight
@@ -343,13 +343,14 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
                     : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
                 }`}
               >
-                Local ($20)
+                <Route className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Local ($20)</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'roads', roadType: 'avenue' })}
-                className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2.5 py-1 rounded-md font-bold text-[11px] transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap text-xs ${
                   isToolActive('roads', 'avenue')
                     ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-400/50 scale-105'
                     : isLight
@@ -357,13 +358,14 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
                     : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
                 }`}
               >
-                Avenue ($50)
+                <Route className="w-3.5 h-3.5 text-sky-400" />
+                <span>Avenue ($50)</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'roads', roadType: 'highway' })}
-                className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2.5 py-1 rounded-md font-bold text-[11px] transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap text-xs ${
                   isToolActive('roads', 'highway')
                     ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-400/50 scale-105'
                     : isLight
@@ -371,7 +373,78 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
                     : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
                 }`}
               >
-                Highway ($100)
+                <Route className="w-3.5 h-3.5 text-amber-400" />
+                <span>Highway ($100)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => selectTool({ category: 'roads', roadType: 'mud' })}
+                className={`px-2.5 py-1 rounded-md font-bold text-[11px] transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap text-xs ${
+                  isToolActive('roads', 'mud')
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-400/50 scale-105'
+                    : isLight
+                    ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                    : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+                }`}
+              >
+                <span>Mud ($10)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => selectTool({ category: 'roads', roadType: 'rural' })}
+                className={`px-2.5 py-1 rounded-md font-bold text-[11px] transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap text-xs ${
+                  isToolActive('roads', 'rural')
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-400/50 scale-105'
+                    : isLight
+                    ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                    : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+                }`}
+              >
+                <span>Rural ($15)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => selectTool({ category: 'roads', roadType: 'pavement' })}
+                className={`px-2.5 py-1 rounded-md font-bold text-[11px] transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap text-xs ${
+                  isToolActive('roads', 'pavement')
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-400/50 scale-105'
+                    : isLight
+                    ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                    : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+                }`}
+              >
+                <span>Pavement ($30)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => selectTool({ category: 'roads', roadType: 'pedestrian' })}
+                className={`px-2.5 py-1 rounded-md font-bold text-[11px] transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap text-xs ${
+                  isToolActive('roads', 'pedestrian')
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-400/50 scale-105'
+                    : isLight
+                    ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                    : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+                }`}
+              >
+                <span>Pedestrian ($25)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => selectTool({ category: 'roads', roadType: 'toll_booth' })}
+                className={`px-2.5 py-1 rounded-md font-bold text-[11px] transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap text-xs ${
+                  isToolActive('roads', 'toll_booth')
+                    ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30 ring-2 ring-amber-300 scale-105'
+                    : isLight
+                    ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                    : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+                }`}
+              >
+                <span>🪙 Toll ($150)</span>
               </button>
             </div>
 
@@ -381,7 +454,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={onToggleRoadCorridorMode}
-                className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap text-xs shrink-0 ${
+                className={`px-2 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap text-xs shrink-0 ${
                   roadCorridorMode
                     ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/30 ring-2 ring-amber-300 scale-105'
                     : isLight
@@ -428,7 +501,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'zones', zoneType: 'residential' })}
-                className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs ${
                   isToolActive('zones', 'residential')
                     ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-400/50 scale-105'
                     : isLight
@@ -443,7 +516,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'zones', zoneType: 'commercial' })}
-                className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs ${
                   isToolActive('zones', 'commercial')
                     ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30 ring-2 ring-sky-400/50 scale-105'
                     : isLight
@@ -458,7 +531,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'zones', zoneType: 'industrial' })}
-                className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs ${
                   isToolActive('zones', 'industrial')
                     ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30 ring-2 ring-amber-400/50 scale-105'
                     : isLight
@@ -473,7 +546,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'zones', zoneType: 'office' })}
-                className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs ${
                   isToolActive('zones', 'office')
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 ring-2 ring-blue-400/50 scale-105'
                     : isLight
@@ -506,7 +579,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'services', serviceType: 'clinic' })}
-                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                   isToolActive('services', 'clinic')
                     ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30 ring-2 ring-rose-300 scale-105'
                     : isLight
@@ -521,7 +594,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'services', serviceType: 'hospital' })}
-                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                   isToolActive('services', 'hospital')
                     ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30 ring-2 ring-rose-300 scale-105'
                     : isLight
@@ -536,7 +609,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'services', serviceType: 'elementary_school' })}
-                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                   isToolActive('services', 'elementary_school')
                     ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30 ring-2 ring-amber-300 scale-105'
                     : isLight
@@ -551,7 +624,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'services', serviceType: 'university' })}
-                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                   isToolActive('services', 'university')
                     ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30 ring-2 ring-amber-300 scale-105'
                     : isLight
@@ -566,7 +639,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'services', serviceType: 'fire_station' })}
-                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                   isToolActive('services', 'fire_station')
                     ? 'bg-orange-600 text-white shadow-md shadow-orange-600/30 ring-2 ring-orange-300 scale-105'
                     : isLight
@@ -581,7 +654,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'services', serviceType: 'police_station' })}
-                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                   isToolActive('services', 'police_station')
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 ring-2 ring-blue-300 scale-105'
                     : isLight
@@ -596,7 +669,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'utilities', serviceType: 'wind_turbine' })}
-                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                   isToolActive('utilities', 'wind_turbine')
                     ? 'bg-yellow-600 text-white shadow-md shadow-yellow-600/30 ring-2 ring-yellow-300 scale-105'
                     : isLight
@@ -611,7 +684,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'utilities', serviceType: 'solar_farm' })}
-                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                   isToolActive('utilities', 'solar_farm')
                     ? 'bg-yellow-600 text-white shadow-md shadow-yellow-600/30 ring-2 ring-yellow-300 scale-105'
                     : isLight
@@ -626,7 +699,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'utilities', serviceType: 'water_tower' })}
-                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                   isToolActive('utilities', 'water_tower')
                     ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30 ring-2 ring-sky-300 scale-105'
                     : isLight
@@ -641,7 +714,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'services', serviceType: 'small_park' })}
-                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                   isToolActive('services', 'small_park')
                     ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-300 scale-105'
                     : isLight
@@ -650,13 +723,58 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
                 }`}
               >
                 <Trees className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Park ($3k)</span>
+                <span>Small Park ($3k)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => selectTool({ category: 'services', serviceType: 'medium_park' })}
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                  isToolActive('services', 'medium_park')
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-300 scale-105'
+                    : isLight
+                    ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                    : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+                }`}
+              >
+                <Trees className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Medium Park ($6k)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => selectTool({ category: 'services', serviceType: 'large_park' })}
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                  isToolActive('services', 'large_park')
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-300 scale-105'
+                    : isLight
+                    ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                    : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+                }`}
+              >
+                <Trees className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Large Park ($10k)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => selectTool({ category: 'services', serviceType: 'grand_park' })}
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                  isToolActive('services', 'grand_park')
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-300 scale-105'
+                    : isLight
+                    ? 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'
+                    : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300'
+                }`}
+              >
+                <Trees className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Grand Park ($20k)</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'services', serviceType: 'parking_lot' })}
-                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                   isToolActive('services', 'parking_lot')
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 ring-2 ring-indigo-300 scale-105'
                     : isLight
@@ -671,7 +789,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'services', serviceType: 'bus_station' })}
-                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                   isToolActive('services', 'bus_station')
                     ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30 ring-2 ring-sky-300 scale-105'
                     : isLight
@@ -686,7 +804,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'utilities', serviceType: 'nuclear_plant' })}
-                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                   isToolActive('utilities', 'nuclear_plant')
                     ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-300 scale-105'
                     : isLight
@@ -701,7 +819,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'utilities', serviceType: 'geothermal_plant' })}
-                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                   isToolActive('utilities', 'geothermal_plant')
                     ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30 ring-2 ring-amber-300 scale-105'
                     : isLight
@@ -716,7 +834,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'utilities', serviceType: 'fusion_reactor' })}
-                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                   isToolActive('utilities', 'fusion_reactor')
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 ring-2 ring-blue-300 scale-105'
                     : isLight
@@ -731,7 +849,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'utilities', serviceType: 'desalination_plant' })}
-                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                   isToolActive('utilities', 'desalination_plant')
                     ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30 ring-2 ring-sky-300 scale-105'
                     : isLight
@@ -746,7 +864,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'services', serviceType: 'recycling_center' })}
-                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                   isToolActive('services', 'recycling_center')
                     ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-300 scale-105'
                     : isLight
@@ -761,7 +879,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'services', serviceType: 'incinerator' })}
-                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                   isToolActive('services', 'incinerator')
                     ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30 ring-2 ring-amber-300 scale-105'
                     : isLight
@@ -776,7 +894,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'services', serviceType: 'subway_station' })}
-                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                   isToolActive('services', 'subway_station')
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 ring-2 ring-indigo-300 scale-105'
                     : isLight
@@ -791,7 +909,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => selectTool({ category: 'services', serviceType: 'tram_depot' })}
-                className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
+                className={`px-2 py-1 rounded-md text-[11px] flex items-center gap-1.5 font-bold transition-all cursor-pointer whitespace-nowrap text-xs ${
                   isToolActive('services', 'tram_depot')
                     ? 'bg-violet-600 text-white shadow-md shadow-violet-600/30 ring-2 ring-violet-300 scale-105'
                     : isLight

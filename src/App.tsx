@@ -201,13 +201,20 @@ function MainGame() {
     }
     const city = cityManagerRef.current;
 
-    const scene = new ThreeSceneManager(canvasContainerRef.current, city);
-    threeSceneRef.current = scene;
-    scene.setContactShadows(contactShadows);
-    scene.setGraphicsQuality(graphicsQuality);
-    scene.onCrash = () => {
+    let scene: ThreeSceneManager | null = null;
+    try {
+      scene = new ThreeSceneManager(canvasContainerRef.current, city);
+      threeSceneRef.current = scene;
+      scene.setContactShadows(contactShadows);
+      scene.setGraphicsQuality(graphicsQuality);
+      scene.onCrash = () => {
+        setThreeSceneCrashed(true);
+      };
+    } catch (err) {
+      console.error('Failed to initialize Three.js viewport:', err);
       setThreeSceneCrashed(true);
-    };
+      return;
+    }
 
     if (pendingActionRef.current === 'load') {
       try {
@@ -284,7 +291,13 @@ function MainGame() {
 
     return () => {
       clearInterval(interval);
-      scene.dispose();
+      if (scene) {
+        try {
+          scene.dispose();
+        } catch (e) {
+          console.warn('Error during scene disposal:', e);
+        }
+      }
     };
   }, [viewMode]);
 
@@ -438,12 +451,11 @@ function MainGame() {
       }
     }
 
-    // In Confirm Mode (Safe): Clicking a tile selects it and inspects it.
+    // In Confirm Mode (Safe): Clicking a tile selects it for placement without popping up inspector modal.
     if (currentPlacementMode === 'confirm') {
       const cell = city.getCell(x, z);
       if (cell) {
         soundEngine.playSelect();
-        setInspectedCell({ ...cell });
       }
       return;
     }
@@ -953,31 +965,77 @@ function MainGame() {
             <div className="w-12 h-12 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
               <Sparkles className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold">3D Graphics Context Interrupted</h3>
+            <h3 className="text-lg font-bold">3D Graphics Engine Recovering</h3>
             <p className="text-xs text-neutral-400 leading-relaxed">
-              Your browser GPU or WebGL context was paused. Click below to instantly reload the 3D renderer without losing any of your city building progress or save data!
+              Your browser graphics pipeline or WebGL context was paused. Choose an option below to immediately continue playing without losing your city progress!
             </p>
-            <button
-              type="button"
-              onClick={() => {
-                setThreeSceneCrashed(false);
-                if (threeSceneRef.current) {
-                  threeSceneRef.current.dispose();
-                  threeSceneRef.current = null;
-                }
-                if (canvasContainerRef.current && cityManagerRef.current) {
-                  const scene = new ThreeSceneManager(canvasContainerRef.current, cityManagerRef.current);
-                  threeSceneRef.current = scene;
-                  scene.setContactShadows(contactShadows);
-                  scene.setGraphicsQuality(graphicsQuality);
-                  scene.onCrash = () => setThreeSceneCrashed(true);
-                  scene.rebuildCityScene();
-                }
-              }}
-              className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all cursor-pointer shadow-lg"
-            >
-              Reload 3D Renderer (Keep Progress)
-            </button>
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setThreeSceneCrashed(false);
+                  if (threeSceneRef.current) {
+                    try {
+                      threeSceneRef.current.dispose();
+                    } catch {}
+                    threeSceneRef.current = null;
+                  }
+                  if (canvasContainerRef.current && cityManagerRef.current) {
+                    try {
+                      const scene = new ThreeSceneManager(canvasContainerRef.current, cityManagerRef.current);
+                      threeSceneRef.current = scene;
+                      scene.setContactShadows(contactShadows);
+                      scene.setGraphicsQuality(graphicsQuality);
+                      scene.onCrash = () => setThreeSceneCrashed(true);
+                      scene.rebuildCityScene();
+                    } catch (err) {
+                      console.error('Renderer reload failed:', err);
+                      setThreeSceneCrashed(true);
+                    }
+                  }
+                }}
+                className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all cursor-pointer shadow-lg text-xs"
+              >
+                Reload 3D Renderer (Keep Progress)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setThreeSceneCrashed(false);
+                  if (threeSceneRef.current) {
+                    try {
+                      threeSceneRef.current.dispose();
+                    } catch {}
+                    threeSceneRef.current = null;
+                  }
+                  if (canvasContainerRef.current && cityManagerRef.current) {
+                    try {
+                      const scene = new ThreeSceneManager(canvasContainerRef.current, cityManagerRef.current);
+                      threeSceneRef.current = scene;
+                      scene.setContactShadows(false);
+                      scene.setGraphicsQuality('low');
+                      scene.onCrash = () => setThreeSceneCrashed(true);
+                      scene.rebuildCityScene();
+                    } catch (err) {
+                      console.error('Low-power renderer reload failed:', err);
+                      setThreeSceneCrashed(true);
+                    }
+                  }
+                }}
+                className="w-full py-2 px-3 bg-sky-700 hover:bg-sky-600 text-white font-medium rounded-xl transition-all cursor-pointer text-xs"
+              >
+                Switch to Low-Power / Performance Mode
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDownloadJson}
+                className="w-full py-2 px-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-medium rounded-xl transition-all cursor-pointer text-xs"
+              >
+                Download City Backup JSON
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -998,10 +1056,61 @@ function MainGame() {
   );
 }
 
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Skyline Architect ErrorBoundary caught:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="w-screen h-screen bg-neutral-950 text-white flex flex-col items-center justify-center p-6 text-center select-none font-sans">
+          <div className="max-w-md w-full bg-neutral-900 border border-neutral-800 rounded-3xl p-8 shadow-2xl space-y-5">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center mx-auto text-3xl font-bold">
+              🏙️
+            </div>
+            <div>
+              <h2 className="text-xl font-extrabold tracking-tight">Skyline Architect</h2>
+              <p className="text-sm text-neutral-400 mt-1">Graphics Session Paused</p>
+            </div>
+            <p className="text-xs text-neutral-400 leading-relaxed">
+              Your browser GPU or WebGL context was interrupted. Click below to re-initialize your session smoothly. All your cities and saves remain intact!
+            </p>
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  this.setState({ hasError: false, error: null });
+                  window.location.reload();
+                }}
+                className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-xl transition cursor-pointer shadow-lg"
+              >
+                Reload Game
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   return (
-    <ThemeProvider>
-      <MainGame />
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <MainGame />
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

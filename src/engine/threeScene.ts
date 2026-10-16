@@ -93,6 +93,20 @@ export class ThreeSceneManager {
   private antennaLights: { mesh: THREE.Mesh; baseIntensity: number }[] = [];
   private parkCitizens: THREE.Group[] = [];
 
+  // Frustum Culling for high-performance rendering of large cities
+  private frustum = new THREE.Frustum();
+  private projScreenMatrix = new THREE.Matrix4();
+
+  // Stored event handlers for clean unbinding
+  private boundOnMouseMove?: (e: MouseEvent) => void;
+  private boundOnMouseUp?: (e: MouseEvent) => void;
+  private boundOnWheel?: (e: WheelEvent) => void;
+  private boundOnTouchStart?: (e: TouchEvent) => void;
+  private boundOnTouchMove?: (e: TouchEvent) => void;
+  private boundOnTouchEnd?: (e: TouchEvent) => void;
+  private boundOnMouseDown?: (e: MouseEvent) => void;
+  private boundOnContextMenu?: (e: Event) => void;
+
   constructor(container: HTMLElement, city: CityManager) {
     this.container = container;
     this.city = city;
@@ -107,36 +121,83 @@ export class ThreeSceneManager {
     this.camera = new THREE.PerspectiveCamera(45, aspect, 0.5, 300);
     this.updateCameraTransform();
 
-    // 3. Renderer with high performance & shadows optimized for mobile/MediaTek GPUs
-    this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      powerPreference: 'high-performance',
-      precision: 'mediump',
-      stencil: false,
-      depth: true,
-    });
-    this.renderer.setSize(container.clientWidth, container.clientHeight);
+    // 3. Renderer with multi-tier fallback & GPU context protection
+    while (container.firstChild) {
+      container.removeChild(container.firstChild);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.style.display = 'block';
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    container.appendChild(canvas);
+
+    let renderer: THREE.WebGLRenderer | null = null;
+    const clientW = Math.max(container.clientWidth, 320);
+    const clientH = Math.max(container.clientHeight, 240);
+
+    try {
+      renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: true,
+        powerPreference: 'high-performance',
+        precision: 'mediump',
+        stencil: false,
+        depth: true,
+        logarithmicDepthBuffer: true,
+        failIfMajorPerformanceCaveat: false,
+      });
+    } catch (e1) {
+      console.warn('Primary WebGLRenderer creation failed, trying fallback...', e1);
+      try {
+        renderer = new THREE.WebGLRenderer({
+          canvas,
+          antialias: false,
+          powerPreference: 'default',
+          precision: 'lowp',
+          stencil: false,
+          depth: true,
+          logarithmicDepthBuffer: true,
+          failIfMajorPerformanceCaveat: false,
+        });
+      } catch (e2) {
+        console.error('All WebGLRenderer creation attempts failed:', e2);
+        throw new Error('WEBGL_CONTEXT_BLOCKED');
+      }
+    }
+
+    this.renderer = renderer;
+    this.renderer.setSize(clientW, clientH);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.35));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.10;
-    container.appendChild(this.renderer.domElement);
 
     // Prevent graphic glitches and handle context loss on mobile / MediaTek devices
     this.renderer.domElement.addEventListener('webglcontextlost', (event) => {
       event.preventDefault();
-      console.warn('WebGL context lost. Pausing render loop...');
-      if (this.animFrameId) cancelAnimationFrame(this.animFrameId);
+      console.warn('WebGL context lost. Pausing render loop and notifying app...');
+      if (this.animFrameId) {
+        cancelAnimationFrame(this.animFrameId);
+        this.animFrameId = null;
+      }
+      if (this.onCrash) {
+        this.onCrash();
+      }
     }, false);
 
     this.renderer.domElement.addEventListener('webglcontextrestored', () => {
       console.info('WebGL context restored. Rebuilding scene & restarting render loop...');
-      this.initSharedResources();
-      this.buildTerrain();
-      this.buildFoliage();
-      this.rebuildCityScene();
-      this.startLoop();
+      try {
+        this.initSharedResources();
+        this.buildTerrain();
+        this.buildFoliage();
+        this.rebuildCityScene();
+        this.startLoop();
+      } catch (err) {
+        console.error('Failed to restore after contextrestored:', err);
+        if (this.onCrash) this.onCrash();
+      }
     }, false);
 
     // 4. Warm Soft Isometric Lights
@@ -327,10 +388,16 @@ export class ThreeSceneManager {
     this.materials.asphalt = new THREE.MeshStandardMaterial({
       color: 0x505d6e,
       roughness: 0.85,
+      polygonOffset: true,
+      polygonOffsetFactor: -3,
+      polygonOffsetUnits: -3,
     });
     this.materials.highwayAsphalt = new THREE.MeshStandardMaterial({
       color: 0x414d5e,
       roughness: 0.8,
+      polygonOffset: true,
+      polygonOffsetFactor: -3,
+      polygonOffsetUnits: -3,
     });
     this.materials.roadLine = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
     this.materials.crosswalk = new THREE.MeshBasicMaterial({ color: 0xffffff });
@@ -338,8 +405,17 @@ export class ThreeSceneManager {
     this.materials.sidewalk = new THREE.MeshStandardMaterial({
       color: 0xe2e8f0,
       roughness: 0.9,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
     });
-    this.materials.curb = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.9 });
+    this.materials.curb = new THREE.MeshStandardMaterial({
+      color: 0xcbd5e1,
+      roughness: 0.9,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+    });
 
     // 1. Residential Palette: Warm community neighborhood tones (terracotta, cream, mint, sage, blush, cedar wood)
     this.materials.resMint = new THREE.MeshStandardMaterial({ color: 0xa7f3d0, roughness: 0.65 });
@@ -483,6 +559,69 @@ export class ThreeSceneManager {
     this.materials.abandonedWood = new THREE.MeshStandardMaterial({ color: 0x3f352e, roughness: 0.98 });
     this.materials.abandonedGlass = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9, metalness: 0.1 });
     this.materials.abandonedSign = new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.9 });
+
+    // Shared Building Base Geometries
+    this.sharedGeos.frontWalk = new THREE.BoxGeometry(0.9, 0.02, 0.35);
+    this.sharedGeos.sidePebble = new THREE.BoxGeometry(0.35, 0.022, 0.45);
+    this.sharedGeos.bush = new THREE.SphereGeometry(0.05, 5, 5);
+    this.sharedGeos.smallTrunk = new THREE.CylinderGeometry(0.012, 0.015, 0.22, 4);
+    this.sharedGeos.smallFoliage = new THREE.ConeGeometry(0.1, 0.26, 5);
+    this.sharedGeos.lampPost = new THREE.CylinderGeometry(0.006, 0.006, 0.1, 4);
+    this.sharedGeos.lampBulb = new THREE.SphereGeometry(0.018, 6, 6);
+
+    // Shared Building Base Materials
+    this.materials.walkMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.85 });
+    this.materials.pebbleMat = new THREE.MeshStandardMaterial({ color: 0xc8b6a6, roughness: 0.9 });
+    this.materials.bushMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.8 });
+    this.materials.smallTrunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9 });
+    this.materials.smallFoliageMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.75 });
+    this.materials.lampMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.7 });
+    this.materials.bulbMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: 0xfde047,
+      emissiveIntensity: 0.8,
+    });
+    this.streetLightMaterials.push(this.materials.bulbMat as THREE.MeshStandardMaterial);
+  }
+
+  private isSharedGeometry(geo: THREE.BufferGeometry): boolean {
+    return Object.values(this.sharedGeos).includes(geo);
+  }
+
+  private isSharedMaterial(mat: THREE.Material): boolean {
+    return Object.values(this.materials).includes(mat);
+  }
+
+  public disposeHierarchy(obj: THREE.Object3D) {
+    obj.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh || (child as THREE.LineSegments).isLineSegments) {
+        const mesh = child as THREE.Mesh;
+        if (mesh.geometry && !this.isSharedGeometry(mesh.geometry)) {
+          mesh.geometry.dispose();
+        }
+        if (mesh.material) {
+          if (Array.isArray(mesh.material)) {
+            mesh.material.forEach((m) => {
+              if (m && !this.isSharedMaterial(m)) {
+                if ('map' in m && m.map && !Object.values(this.materials).some(sm => 'map' in sm && (sm as any).map === m.map)) {
+                  (m.map as THREE.Texture).dispose();
+                }
+                m.dispose();
+              }
+            });
+          } else {
+            const m = mesh.material;
+            if (m && !this.isSharedMaterial(m)) {
+              if ('map' in m && m.map && !Object.values(this.materials).some(sm => 'map' in sm && (sm as any).map === m.map)) {
+                (m.map as THREE.Texture).dispose();
+              }
+              m.dispose();
+            }
+          }
+        }
+      }
+    });
+    obj.clear();
   }
 
   // Pre-instantiated vehicle pool for zero-allocation performance
@@ -562,10 +701,10 @@ export class ThreeSceneManager {
   }
 
   public buildTerrain() {
-    this.terrainGroup.clear();
+    this.disposeHierarchy(this.terrainGroup);
 
-    const tileGeo = new THREE.BoxGeometry(1, 0.35, 1);
-    tileGeo.translate(0, -0.175, 0);
+    const tileGeo = new THREE.BoxGeometry(1, 0.8, 1);
+    tileGeo.translate(0, -0.4, 0);
 
     for (let x = 0; x < GRID_SIZE; x++) {
       for (let z = 0; z < GRID_SIZE; z++) {
@@ -588,17 +727,17 @@ export class ThreeSceneManager {
       }
     }
 
-    // Outer bedrock foundation
-    const baseGeo = new THREE.BoxGeometry(GRID_SIZE + 4, 1.8, GRID_SIZE + 4);
+    // Outer bedrock foundation (positioned deeply below terrain bottom)
+    const baseGeo = new THREE.BoxGeometry(GRID_SIZE + 6, 4.0, GRID_SIZE + 6);
     const baseMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
     const baseMesh = new THREE.Mesh(baseGeo, baseMat);
-    baseMesh.position.set(GRID_SIZE / 2, -1.1, GRID_SIZE / 2);
+    baseMesh.position.set(GRID_SIZE / 2, -2.6, GRID_SIZE / 2);
     baseMesh.receiveShadow = true;
     this.terrainGroup.add(baseMesh);
   }
 
   public buildFoliage() {
-    this.foliageGroup.clear();
+    this.disposeHierarchy(this.foliageGroup);
 
     const trunkGeo = new THREE.CylinderGeometry(0.06, 0.08, 0.4, 5);
     trunkGeo.translate(0, 0.2, 0);
@@ -610,7 +749,7 @@ export class ThreeSceneManager {
     for (let x = 0; x < GRID_SIZE; x++) {
       for (let z = 0; z < GRID_SIZE; z++) {
         const cell = this.city.grid[x][z];
-        if (cell.terrain === 'grass' && !cell.road && !cell.building && !cell.service) {
+        if (cell.terrain === 'grass' && !cell.road && !cell.building && !cell.service && cell.hasTree !== false) {
           const noise = Math.sin(x * 0.45) * Math.cos(z * 0.45);
           if (noise > 0.48 && Math.random() < 0.6) {
             const tree = new THREE.Group();
@@ -632,12 +771,12 @@ export class ThreeSceneManager {
   }
 
   public rebuildCityScene() {
-    this.roadGroup.clear();
-    this.buildingGroup.clear();
-    this.serviceGroup.clear();
-    this.overlayGroup.clear();
-    this.gatewayGroup.clear();
-    this.particleGroup.clear();
+    this.disposeHierarchy(this.roadGroup);
+    this.disposeHierarchy(this.buildingGroup);
+    this.disposeHierarchy(this.serviceGroup);
+    this.disposeHierarchy(this.overlayGroup);
+    this.disposeHierarchy(this.gatewayGroup);
+    this.disposeHierarchy(this.particleGroup);
     this.windTurbineRotors = [];
     this.smokeParticles = [];
     this.windowMaterials = [];
@@ -728,57 +867,71 @@ export class ThreeSceneManager {
   // 100% Continuous, Gap-Free Road Mesh with Seamless Connections & Crosswalks
   private createRoadMesh(x: number, z: number, cell: CellData) {
     const isBridge = cell.terrain === 'water';
-    const isHwy = cell.road!.type === 'highway';
+    const rType = cell.road!.type;
+    const isHwy = rType === 'highway';
+    const isMud = rType === 'mud';
+    const isRural = rType === 'rural';
+    const isPavement = rType === 'pavement';
+    const isPedestrian = rType === 'pedestrian';
+    const isToll = rType === 'toll_booth';
+
     const roadGroup = new THREE.Group();
-    roadGroup.position.set(x + 0.5, isBridge ? 0.22 : 0.015, z + 0.5);
+    roadGroup.position.set(x + 0.5, isBridge ? 0.08 : 0.02, z + 0.5);
 
-    const roadWidth = isHwy ? 0.94 : cell.road!.type === 'avenue' ? 0.88 : 0.78;
-    const asphaltMat = isHwy ? this.materials.highwayAsphalt : this.materials.asphalt;
+    const roadWidth = isHwy ? 0.94 : rType === 'avenue' ? 0.88 : 0.78;
+    const asphaltMat = isHwy || isToll ? this.materials.highwayAsphalt 
+      : isMud ? new THREE.MeshStandardMaterial({ color: 0x85573b, roughness: 0.9 }) 
+      : isRural ? new THREE.MeshStandardMaterial({ color: 0xa39171, roughness: 0.8 }) 
+      : isPavement ? new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.5 }) 
+      : isPedestrian ? new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.7 }) 
+      : this.materials.asphalt;
 
-    // 1. Continuous Sidewalk Sub-base (Full 1.0 x 1.0 tile to prevent any ground gap)
+    // 1. Continuous Sidewalk Sub-base (Flat pad at y = 0.002)
     if (!isHwy) {
-      const swGeo = new THREE.BoxGeometry(1.0, 0.02, 1.0);
+      const swGeo = new THREE.BoxGeometry(1.0, 0.004, 1.0);
       const swMesh = new THREE.Mesh(swGeo, this.materials.sidewalk);
-      swMesh.position.y = -0.01;
+      swMesh.position.y = 0.002;
       swMesh.receiveShadow = true;
       roadGroup.add(swMesh);
     }
 
-    // 2. Central Road Core
-    const coreGeo = new THREE.BoxGeometry(roadWidth, 0.03, roadWidth);
+    // 2. Central Road Core (Elevated cleanly at y = 0.016 with polygon offset)
+    const roadY = 0.016;
+    const roadThickness = 0.012;
+    const coreGeo = new THREE.BoxGeometry(roadWidth, roadThickness, roadWidth);
     const coreMesh = new THREE.Mesh(coreGeo, asphaltMat);
+    coreMesh.position.y = roadY;
     coreMesh.receiveShadow = true;
     roadGroup.add(coreMesh);
 
     // 3. Continuous Road Arms Extending to Borders
     const conn = cell.road!.connections;
-    const armThickness = 0.03;
 
     if (conn.north) {
-      const armGeo = new THREE.BoxGeometry(roadWidth, armThickness, 0.5);
+      const armGeo = new THREE.BoxGeometry(roadWidth, roadThickness, 0.5);
       const arm = new THREE.Mesh(armGeo, asphaltMat);
-      arm.position.set(0, 0, -0.25);
+      arm.position.set(0, roadY, -0.25);
       arm.receiveShadow = true;
       roadGroup.add(arm);
     }
     if (conn.south) {
-      const armGeo = new THREE.BoxGeometry(roadWidth, armThickness, 0.5);
+      const armGeo = new THREE.BoxGeometry(roadWidth, roadThickness, 0.5);
       const arm = new THREE.Mesh(armGeo, asphaltMat);
-      arm.position.set(0, 0, 0.25);
+      arm.position.set(0, roadY, 0.25);
       arm.receiveShadow = true;
       roadGroup.add(arm);
     }
     if (conn.east) {
-      const armGeo = new THREE.BoxGeometry(0.5, armThickness, roadWidth);
+      const armGeo = new THREE.BoxGeometry(0.5, roadThickness, roadWidth);
       const arm = new THREE.Mesh(armGeo, asphaltMat);
-      arm.position.set(0.25, 0, 0);
+      arm.position.set(0.25, roadY, 0);
       arm.receiveShadow = true;
       roadGroup.add(arm);
     }
     if (conn.west) {
-      const armGeo = new THREE.BoxGeometry(0.5, armThickness, roadWidth);
+      const armGeo = new THREE.BoxGeometry(0.5, roadThickness, roadWidth);
       const arm = new THREE.Mesh(armGeo, asphaltMat);
-      arm.position.set(-0.25, 0, 0);
+      arm.position.set(-0.25, roadY, 0);
       arm.receiveShadow = true;
       roadGroup.add(arm);
     }
@@ -786,39 +939,42 @@ export class ThreeSceneManager {
     // If isolated road without connections, extend in N-S direction so it looks clean
     const hasAnyConn = conn.north || conn.south || conn.east || conn.west;
     if (!hasAnyConn) {
-      const isoArmGeo = new THREE.BoxGeometry(roadWidth, armThickness, 1.0);
+      const isoArmGeo = new THREE.BoxGeometry(roadWidth, roadThickness, 1.0);
       const isoArm = new THREE.Mesh(isoArmGeo, asphaltMat);
+      isoArm.position.y = roadY;
+      isoArm.receiveShadow = true;
       roadGroup.add(isoArm);
     }
 
-    // 4. Clean Single Road Centerline (No side-by-side hatching)
+    // 4. Clean Single Road Centerline Stripe (Elevated at y = 0.024)
     const lineMat = isHwy ? this.materials.highwayYellow : this.materials.roadLine;
     const isStraightNS = (conn.north || conn.south) && !conn.east && !conn.west;
     const isStraightEW = (conn.east || conn.west) && !conn.north && !conn.south;
     const numConnections = (conn.north ? 1 : 0) + (conn.south ? 1 : 0) + (conn.east ? 1 : 0) + (conn.west ? 1 : 0);
+    const stripeY = roadY + (roadThickness / 2) + 0.002;
 
     if (isStraightNS || !hasAnyConn) {
-      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.004, 0.6), lineMat);
-      stripe.position.set(0, 0.02, 0);
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.003, 0.6), lineMat);
+      stripe.position.set(0, stripeY, 0);
       roadGroup.add(stripe);
     } else if (isStraightEW) {
-      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.004, 0.03), lineMat);
-      stripe.position.set(0, 0.02, 0);
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.003, 0.03), lineMat);
+      stripe.position.set(0, stripeY, 0);
       roadGroup.add(stripe);
     } else if (numConnections === 2) {
-      const curveStripe = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.004, 0.4), lineMat);
-      curveStripe.position.set(0, 0.02, 0);
+      const curveStripe = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.003, 0.4), lineMat);
+      curveStripe.position.set(0, stripeY, 0);
       roadGroup.add(curveStripe);
     }
 
     // 5. Bridge Piers & Railings if spanning river
     if (isBridge) {
-      const pierGeo = new THREE.CylinderGeometry(0.07, 0.09, 0.5, 6);
+      const pierGeo = new THREE.CylinderGeometry(0.06, 0.08, 0.2, 6);
       const pierMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.9 });
       const pier1 = new THREE.Mesh(pierGeo, pierMat);
-      pier1.position.set(-0.36, -0.25, 0);
+      pier1.position.set(-0.36, -0.1, 0);
       const pier2 = new THREE.Mesh(pierGeo, pierMat);
-      pier2.position.set(0.36, -0.25, 0);
+      pier2.position.set(0.36, -0.1, 0);
       roadGroup.add(pier1);
       roadGroup.add(pier2);
 
@@ -832,11 +988,28 @@ export class ThreeSceneManager {
       roadGroup.add(railR);
     }
 
-    // Street lamp
-    if ((x + z) % 4 === 0 && !isHwy && !isBridge) {
-      const lamp = this.createStreetLamp();
-      lamp.position.set(0.44, 0, 0.44);
-      roadGroup.add(lamp);
+
+
+    // Parking lane / parked cars
+    if (!isHwy && !isPedestrian && (x + z) % 2 === 0) {
+      const carColors = [0xef4444, 0x3b82f6, 0x10b981, 0xf59e0b, 0x64748b];
+      const carColor = carColors[(x * 7 + z * 13) % carColors.length];
+      const parkedCar = new THREE.Mesh(
+        new THREE.BoxGeometry(0.16, 0.09, 0.32),
+        new THREE.MeshStandardMaterial({ color: carColor, roughness: 0.3, metalness: 0.5 })
+      );
+      parkedCar.position.set(0.28, 0.07, 0);
+      roadGroup.add(parkedCar);
+    }
+
+    // Toll booth structure
+    if (isToll) {
+      const booth = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 0.3), new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.3 }));
+      booth.position.set(0, 0.15, 0);
+      roadGroup.add(booth);
+      const canopy = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.04, 0.44), new THREE.MeshStandardMaterial({ color: 0xef4444 }));
+      canopy.position.set(0, 0.3, 0);
+      roadGroup.add(canopy);
     }
 
     this.roadGroup.add(roadGroup);
@@ -913,62 +1086,41 @@ export class ThreeSceneManager {
   }
 
   private createBuildingBaseEnvironment(group: THREE.Group, zone: string) {
-    // 1. Half-tile pedestrian walkway / alleyway pad (extending along front & side, leaving the other half open)
-    const walkMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.85 });
-    const pebbleMat = new THREE.MeshStandardMaterial({ color: 0xc8b6a6, roughness: 0.9 });
-    
-    // Front alleyway concrete strip
-    const frontWalk = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.02, 0.35), walkMat);
+    // 1. Half-tile pedestrian walkway / alleyway pad
+    const frontWalk = new THREE.Mesh(this.sharedGeos.frontWalk, this.materials.walkMat);
     frontWalk.position.set(0, 0.01, 0.28);
     frontWalk.receiveShadow = true;
     group.add(frontWalk);
 
-    // Side pebble / aggregate walkway strip between building edges
-    const sidePebble = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.022, 0.45), pebbleMat);
+    const sidePebble = new THREE.Mesh(this.sharedGeos.sidePebble, this.materials.pebbleMat);
     sidePebble.position.set(-0.28, 0.012, -0.02);
     sidePebble.receiveShadow = true;
     group.add(sidePebble);
 
     // 2. Small Bushes along the alleyway
-    const bushMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.8 });
-    const bushGeo = new THREE.SphereGeometry(0.05, 5, 5);
-    
-    const b1 = new THREE.Mesh(bushGeo, bushMat);
+    const b1 = new THREE.Mesh(this.sharedGeos.bush, this.materials.bushMat);
     b1.position.set(-0.35, 0.04, 0.42);
     group.add(b1);
 
-    const b2 = new THREE.Mesh(bushGeo, bushMat);
+    const b2 = new THREE.Mesh(this.sharedGeos.bush, this.materials.bushMat);
     b2.position.set(0.35, 0.04, 0.42);
     group.add(b2);
 
     // 3. Small Tree in the alleyway recess
-    const trunkGeo = new THREE.CylinderGeometry(0.012, 0.015, 0.22, 4);
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9 });
-    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+    const trunk = new THREE.Mesh(this.sharedGeos.smallTrunk, this.materials.smallTrunkMat);
     trunk.position.set(-0.32, 0.11, -0.25);
     group.add(trunk);
 
-    const foliageGeo = new THREE.ConeGeometry(0.1, 0.26, 5);
-    const foliageMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.75 });
-    const foliage = new THREE.Mesh(foliageGeo, foliageMat);
+    const foliage = new THREE.Mesh(this.sharedGeos.smallFoliage, this.materials.smallFoliageMat);
     foliage.position.set(-0.32, 0.28, -0.25);
     group.add(foliage);
 
     // 4. Small Pathway Lights (Bollard Lamps) along the alleyway path
-    const lampPostGeo = new THREE.CylinderGeometry(0.006, 0.006, 0.1, 4);
-    const lampMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.7 });
-    const bulbMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      emissive: 0xfde047,
-      emissiveIntensity: 0.8,
-    });
-    this.streetLightMaterials.push(bulbMat);
-
-    const lampPost = new THREE.Mesh(lampPostGeo, lampMat);
+    const lampPost = new THREE.Mesh(this.sharedGeos.lampPost, this.materials.lampMat);
     lampPost.position.set(0.28, 0.05, 0.42);
     group.add(lampPost);
 
-    const lampBulb = new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 6), bulbMat);
+    const lampBulb = new THREE.Mesh(this.sharedGeos.lampBulb, this.materials.bulbMat);
     lampBulb.position.set(0.28, 0.10, 0.42);
     group.add(lampBulb);
   }
@@ -2828,6 +2980,29 @@ export class ThreeSceneManager {
         break;
       }
 
+      case 'medium_park': {
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.04, 0.96), this.materials.grass);
+        base.position.y = 0.02; group.add(base);
+        const gazebo = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.14, 6), this.materials.resWood);
+        gazebo.position.set(0, 0.15, 0); group.add(gazebo);
+        group.add(this.createParkCitizen(-0.25, 0.04, 0.25, 0x3b82f6, true));
+        group.add(this.createParkCitizen(0.25, 0.04, -0.25, 0xec4899, true));
+        break;
+      }
+      case 'grand_park': {
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.04, 0.96), this.materials.grass);
+        base.position.y = 0.02; group.add(base);
+        const lake1 = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.3, 0.05, 12), this.materials.water);
+        lake1.position.set(-0.2, 0.04, -0.2); group.add(lake1);
+        const lake2 = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.3, 0.05, 12), this.materials.water);
+        lake2.position.set(0.2, 0.04, 0.2); group.add(lake2);
+        for (let i = 0; i < 6; i++) {
+          const col = [0x3b82f6, 0xef4444, 0x10b981, 0xf59e0b, 0x8b5cf6, 0x06b6d4][i];
+          group.add(this.createParkCitizen((i - 2.5) * 0.15, 0.04, (i % 2 === 0 ? 0.2 : -0.2), col, false));
+        }
+        break;
+      }
+
       default: {
         const bld = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), new THREE.MeshStandardMaterial({ color: 0x475569 }));
         bld.position.y = 0.4;
@@ -3133,7 +3308,7 @@ export class ThreeSceneManager {
     el.style.touchAction = 'none';
 
     // Touch Start
-    el.addEventListener('touchstart', (e: TouchEvent) => {
+    this.boundOnTouchStart = (e: TouchEvent) => {
       e.preventDefault();
       if (e.touches.length === 1) {
         this.isPointerDown = true;
@@ -3167,10 +3342,11 @@ export class ThreeSceneManager {
           y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
         };
       }
-    }, { passive: false });
+    };
+    el.addEventListener('touchstart', this.boundOnTouchStart, { passive: false });
 
     // Touch Move: pan camera smoothly without accidental building in Confirm Mode, or paint in Rapid Mode
-    el.addEventListener('touchmove', (e: TouchEvent) => {
+    this.boundOnTouchMove = (e: TouchEvent) => {
       e.preventDefault();
       if (e.touches.length === 1 && this.isPointerDown) {
         const t = e.touches[0];
@@ -3226,10 +3402,11 @@ export class ThreeSceneManager {
 
         this.updateCameraTransform();
       }
-    }, { passive: false });
+    };
+    el.addEventListener('touchmove', this.boundOnTouchMove, { passive: false });
 
     // Touch End: handle deliberate taps without dragging
-    el.addEventListener('touchend', (e: TouchEvent) => {
+    this.boundOnTouchEnd = (e: TouchEvent) => {
       e.preventDefault();
       const t = e.changedTouches[0];
       if (t && !this.isTwoFingerTouch) {
@@ -3247,10 +3424,11 @@ export class ThreeSceneManager {
       this.isPointerDown = false;
       this.isTwoFingerTouch = false;
       this.lastBuiltCoord = null;
-    }, { passive: false });
+    };
+    el.addEventListener('touchend', this.boundOnTouchEnd, { passive: false });
 
     // Desktop Mouse Pointer Events
-    el.addEventListener('mousedown', (e: MouseEvent) => {
+    this.boundOnMouseDown = (e: MouseEvent) => {
       if (e.button === 0) {
         this.isPointerDown = true;
         this.touchStartPos = { x: e.clientX, y: e.clientY };
@@ -3274,11 +3452,13 @@ export class ThreeSceneManager {
         this.isRightDragging = true;
         this.lastTouchPos = { x: e.clientX, y: e.clientY };
       }
-    });
+    };
+    el.addEventListener('mousedown', this.boundOnMouseDown);
 
-    el.addEventListener('contextmenu', (e) => e.preventDefault());
+    this.boundOnContextMenu = (e: Event) => e.preventDefault();
+    el.addEventListener('contextmenu', this.boundOnContextMenu);
 
-    window.addEventListener('mousemove', (e: MouseEvent) => {
+    this.boundOnMouseMove = (e: MouseEvent) => {
       const coord = this.getCoordFromClient(e.clientX, e.clientY);
       if (coord) {
         this.hoveredCoord = coord;
@@ -3322,9 +3502,10 @@ export class ThreeSceneManager {
       }
 
       this.lastTouchPos = { x: e.clientX, y: e.clientY };
-    });
+    };
+    window.addEventListener('mousemove', this.boundOnMouseMove);
 
-    window.addEventListener('mouseup', (e: MouseEvent) => {
+    this.boundOnMouseUp = (e: MouseEvent) => {
       if (e.button === 0) {
         const netDist = Math.hypot(e.clientX - this.touchStartPos.x, e.clientY - this.touchStartPos.y);
         // If it was an intentional click (not a camera scroll/pan)
@@ -3342,15 +3523,32 @@ export class ThreeSceneManager {
       } else if (e.button === 2) {
         this.isRightDragging = false;
       }
-    });
+    };
+    window.addEventListener('mouseup', this.boundOnMouseUp);
 
-    el.addEventListener('wheel', (e: WheelEvent) => {
+    this.boundOnWheel = (e: WheelEvent) => {
       e.preventDefault();
       this.cameraRadius = Math.max(10, Math.min(70, this.cameraRadius + e.deltaY * 0.04));
       this.updateCameraTransform();
-    }, { passive: false });
+    };
+    el.addEventListener('wheel', this.boundOnWheel, { passive: false });
 
     window.addEventListener('resize', this.onResize);
+  }
+
+  private unbindTouchAndPointerEvents() {
+    const el = this.renderer?.domElement;
+    if (el) {
+      if (this.boundOnTouchStart) el.removeEventListener('touchstart', this.boundOnTouchStart);
+      if (this.boundOnTouchMove) el.removeEventListener('touchmove', this.boundOnTouchMove);
+      if (this.boundOnTouchEnd) el.removeEventListener('touchend', this.boundOnTouchEnd);
+      if (this.boundOnMouseDown) el.removeEventListener('mousedown', this.boundOnMouseDown);
+      if (this.boundOnContextMenu) el.removeEventListener('contextmenu', this.boundOnContextMenu);
+      if (this.boundOnWheel) el.removeEventListener('wheel', this.boundOnWheel);
+    }
+    if (this.boundOnMouseMove) window.removeEventListener('mousemove', this.boundOnMouseMove);
+    if (this.boundOnMouseUp) window.removeEventListener('mouseup', this.boundOnMouseUp);
+    window.removeEventListener('resize', this.onResize);
   }
 
   // Mathematically accurate ground-plane camera panning relative to current camera yaw angle
@@ -3545,6 +3743,26 @@ export class ThreeSceneManager {
         this.updateVehiclesRendering();
         this.updatePedestriansRendering();
 
+        // Frustum culling for high-performance rendering of off-camera buildings and foliage
+        this.camera.updateMatrixWorld();
+        this.projScreenMatrix.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
+        this.frustum.setFromProjectionMatrix(this.projScreenMatrix);
+
+        const cullGroup = (group: THREE.Group) => {
+          for (let i = 0; i < group.children.length; i++) {
+            const child = group.children[i];
+            const pos = child.position;
+            const inFrustum = this.frustum.containsPoint(pos) ||
+              (Math.abs(pos.x - this.cameraTarget.x) < this.cameraRadius * 1.6 &&
+               Math.abs(pos.z - this.cameraTarget.z) < this.cameraRadius * 1.6);
+            child.visible = inFrustum;
+          }
+        };
+
+        cullGroup(this.buildingGroup);
+        cullGroup(this.serviceGroup);
+        cullGroup(this.foliageGroup);
+
         this.renderer.render(this.scene, this.camera);
         this.animFrameId = requestAnimationFrame(loop);
       } catch (err) {
@@ -3559,11 +3777,61 @@ export class ThreeSceneManager {
   }
 
   public dispose() {
-    if (this.animFrameId) cancelAnimationFrame(this.animFrameId);
-    window.removeEventListener('resize', this.onResize);
-    this.renderer.dispose();
-    if (this.container && this.renderer.domElement.parentElement === this.container) {
-      this.container.removeChild(this.renderer.domElement);
+    if (this.animFrameId) {
+      cancelAnimationFrame(this.animFrameId);
+      this.animFrameId = null;
+    }
+    this.unbindTouchAndPointerEvents();
+
+    // Dispose all scene hierarchy groups
+    this.disposeHierarchy(this.terrainGroup);
+    this.disposeHierarchy(this.roadGroup);
+    this.disposeHierarchy(this.buildingGroup);
+    this.disposeHierarchy(this.serviceGroup);
+    this.disposeHierarchy(this.vehicleGroup);
+    this.disposeHierarchy(this.pedestrianGroup);
+    this.disposeHierarchy(this.overlayGroup);
+    this.disposeHierarchy(this.particleGroup);
+    this.disposeHierarchy(this.foliageGroup);
+    this.disposeHierarchy(this.gatewayGroup);
+
+    // Dispose shared geometries
+    for (const key in this.sharedGeos) {
+      try {
+        this.sharedGeos[key]?.dispose();
+      } catch {}
+    }
+    this.sharedGeos = {};
+
+    // Dispose shared materials & textures
+    for (const key in this.materials) {
+      try {
+        const mat = this.materials[key];
+        if ('map' in mat && (mat as any).map) {
+          ((mat as any).map as THREE.Texture).dispose();
+        }
+        mat?.dispose();
+      } catch {}
+    }
+    this.materials = {};
+
+    // Dispose interaction meshes
+    try {
+      this.hoverPlane?.geometry?.dispose();
+      (this.hoverPlane?.material as THREE.Material)?.dispose();
+      this.selectedTileMesh?.geometry?.dispose();
+      (this.selectedTileMesh?.material as THREE.Material)?.dispose();
+    } catch {}
+
+    // Dispose renderer and force GPU context release
+    if (this.renderer) {
+      try {
+        this.renderer.dispose();
+        this.renderer.forceContextLoss();
+      } catch {}
+      if (this.container && this.renderer.domElement && this.renderer.domElement.parentElement === this.container) {
+        this.container.removeChild(this.renderer.domElement);
+      }
     }
   }
 }
