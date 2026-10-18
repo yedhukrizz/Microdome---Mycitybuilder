@@ -14,10 +14,16 @@ import {
   ServiceData,
   ServiceType,
   Vehicle,
+  CarModelVariant,
   VehicleTripState,
   Pedestrian,
   ZoneType,
+  RaiderEntity,
+  MilitiaEntity,
+  CombatShot,
+  DefenseStatus,
 } from '../types/city';
+import { soundEngine } from '../audio/soundEngine';
 
 export const GRID_SIZE = 36;
 
@@ -119,6 +125,11 @@ export const TOOL_COSTS: Record<string, number> = {
   bld_commercial_center: 1500,
   bld_clean_factory: 800,
   bld_tech_office: 1800,
+  bld_condo_complex_2x2: 3800,
+  bld_mall_galleria_2x2: 4500,
+  bld_logistics_hub_2x2: 3200,
+  bld_corporate_plaza_2x2: 5500,
+  bld_tech_megaplex_4x4: 18000,
   // Utilities
   wind_turbine: 6000,
   solar_farm: 14000,
@@ -147,6 +158,8 @@ export const TOOL_COSTS: Record<string, number> = {
   tram_depot: 20000,
   recycling_center: 15000,
   incinerator: 22000,
+  army_barracks: 15000,
+  defense_tower: 12000,
   forest: 2000,
 };
 
@@ -177,6 +190,8 @@ export const SERVICE_MAINTENANCE: Record<ServiceType, number> = {
   bus_station: 120,
   subway_station: 450,
   tram_depot: 250,
+  army_barracks: 400,
+  defense_tower: 300,
   forest: 30,
 };
 
@@ -253,6 +268,10 @@ export class CityManager {
     needsJobs: 100,
     needsTaxSatisfaction: 100,
     needsEnvironment: 100,
+    wasteGenerated: 0,
+    wasteProcessed: 0,
+    wasteCoverage: 100,
+    needsWaste: 100,
   };
   public demands: CityDemands = {
     residential: 60,
@@ -268,6 +287,22 @@ export class CityManager {
   public milestones: Milestone[] = JSON.parse(JSON.stringify(INITIAL_MILESTONES));
   public vehicles: Vehicle[] = [];
   public pedestrians: Pedestrian[] = [];
+  public raiders: RaiderEntity[] = [];
+  public militiaUnits: MilitiaEntity[] = [];
+  public combatShots: CombatShot[] = [];
+  public waveNumber: number = 0;
+  public waveActive: boolean = false;
+  public raidersRemaining: number = 0;
+  public totalRaidersInWave: number = 0;
+  public waveTimer: number = 45; // 45s countdown to initial wave
+  public waveWarningTriggered: boolean = false;
+  public lastWaveResult: 'victory' | 'surrender' | 'defeat' | null = null;
+  public lastWaveAmount: number = 0;
+  public onWaveEvent?: (event: 'warning' | 'start' | 'victory' | 'surrender' | 'defeat', details: any) => void;
+  public totalDamageIncurred: number = 0;
+  public damageRepairsPaid: number = 0;
+  public destroyedRaiderIds: Set<string> = new Set();
+
   public history: CityHistorySnapshot[] = [];
   public overlayMode: OverlayMode = 'none';
   public onMilestoneAchieved?: (milestone: Milestone) => void;
@@ -674,117 +709,274 @@ export class CityManager {
   }
 
   public applyTool(x: number, z: number, tool: ActiveTool): { success: boolean; message?: string } {
+    const size = tool.size || (
+      tool.category === 'buildings'
+        ? (tool.buildingType === 'tech_megaplex_4x4' ? 4 : tool.buildingType.includes('2x2') ? 2 : 1)
+        : 1
+    );
+
+    if (x + size > GRID_SIZE || z + size > GRID_SIZE) {
+      return { success: false, message: `Cannot place ${size}x${size} element out of city grid bounds!` };
+    }
+
     const cell = this.getCell(x, z);
     if (!cell) return { success: false, message: 'Invalid coordinate' };
 
     switch (tool.category) {
       case 'roads': {
         const costKey = `road_${tool.roadType}`;
-        const cost = TOOL_COSTS[costKey] || 30;
-        if (this.budget.treasury < cost) {
-          return { success: false, message: 'Insufficient funds for road!' };
+        const costPerTile = TOOL_COSTS[costKey] || 30;
+        const totalCost = costPerTile * size * size;
+        if (this.budget.treasury < totalCost) {
+          return { success: false, message: `Insufficient funds for road! Need $${totalCost}` };
         }
-        if (cell.building || cell.service) {
-          return { success: false, message: 'Tile is occupied!' };
+
+        for (let dx = 0; dx < size; dx++) {
+          for (let dz = 0; dz < size; dz++) {
+            const c = this.getCell(x + dx, z + dz);
+            if (c?.building || c?.service) {
+              return { success: false, message: 'Tile is occupied by building or service!' };
+            }
+          }
         }
-        this.budget.treasury -= cost;
-        this.placeRoad(x, z, tool.roadType, true);
+
+        this.budget.treasury -= totalCost;
+        for (let dx = 0; dx < size; dx++) {
+          for (let dz = 0; dz < size; dz++) {
+            this.placeRoad(x + dx, z + dz, tool.roadType, false);
+          }
+        }
+        this.recalculateRoadConnections();
+        this.recomputeNetworksAndSimulation(true);
         return { success: true };
       }
 
       case 'zones': {
-        if (cell.terrain === 'water') {
-          return { success: false, message: 'Cannot zone on water!' };
+        const costKey = `zone_${tool.zoneType}`;
+        const costPerTile = TOOL_COSTS[costKey] || 10;
+        const totalCost = costPerTile * size * size;
+        if (this.budget.treasury < totalCost) {
+          return { success: false, message: `Insufficient funds for zoning! Need $${totalCost}` };
         }
-        if (cell.road || cell.service) {
-          return { success: false, message: 'Tile occupied by road or service! Bulldoze first.' };
-        }
+
         if (tool.zoneType === 'dezone') {
-          cell.building = null;
-          cell.zone = null;
+          for (let dx = 0; dx < size; dx++) {
+            for (let dz = 0; dz < size; dz++) {
+              const c = this.getCell(x + dx, z + dz);
+              if (c) {
+                c.building = null;
+                c.zone = null;
+              }
+            }
+          }
           this.recomputeNetworksAndSimulation(true);
           return { success: true };
         }
-        const costKey = `zone_${tool.zoneType}`;
-        const cost = TOOL_COSTS[costKey] || 10;
-        if (this.budget.treasury < cost) {
-          return { success: false, message: 'Insufficient funds for zoning!' };
-        }
-        this.budget.treasury -= cost;
-        this.setZone(x, z, tool.zoneType, false);
 
-        // Immediately spawn or upgrade building on this zoned tile!
-        if (!cell.building) {
-          this.spawnBuilding(x, z, tool.zoneType, 1);
-        } else if (cell.building.zone === tool.zoneType && cell.building.level < 5) {
-          cell.building.level += 1;
-          cell.building.height = 0.8 + cell.building.level * 0.6;
-          cell.building.name = this.generateBuildingName(tool.zoneType, cell.building.level);
-        } else if (cell.building.zone !== tool.zoneType) {
-          // Replaced zone with a new zone
-          this.spawnBuilding(x, z, tool.zoneType, 1);
+        this.budget.treasury -= totalCost;
+        if (size > 1) {
+          // Check if whole footprint is buildable
+          let canPlaceMulti = true;
+          for (let dx = 0; dx < size; dx++) {
+            for (let dz = 0; dz < size; dz++) {
+              const c = this.getCell(x + dx, z + dz);
+              if (!c || c.terrain === 'water' || c.road || c.service) {
+                canPlaceMulti = false;
+                break;
+              }
+            }
+            if (!canPlaceMulti) break;
+          }
+
+          if (canPlaceMulti) {
+            const multiB = this.spawnBuilding(x, z, tool.zoneType, size === 4 ? 4 : 2, size as 2 | 4);
+            multiB.name = size === 4
+              ? (tool.zoneType === 'office' ? 'TECH MEGAPLEX' : tool.zoneType === 'residential' ? 'GARDEN RESIDENCES' : tool.zoneType === 'commercial' ? 'GRAND GALLERIA' : 'GIGAFACTORY HUB')
+              : (tool.zoneType === 'residential' ? 'CONDO COMPLEX' : tool.zoneType === 'commercial' ? 'SHOPPING GALLERIA' : tool.zoneType === 'office' ? 'CORPORATE PLAZA' : 'LOGISTICS HUB');
+            multiB.constructionProgress = 1.0;
+
+            for (let dx = 0; dx < size; dx++) {
+              for (let dz = 0; dz < size; dz++) {
+                const subCell = this.grid[x + dx][z + dz];
+                subCell.zone = tool.zoneType;
+                subCell.building = multiB;
+                subCell.road = null;
+                subCell.service = null;
+                subCell.hasTree = false;
+              }
+            }
+            this.recomputeNetworksAndSimulation(true);
+            return { success: true };
+          }
         }
 
+        for (let dx = 0; dx < size; dx++) {
+          for (let dz = 0; dz < size; dz++) {
+            const c = this.getCell(x + dx, z + dz);
+            if (c) {
+              if (c.terrain === 'water' || c.road || c.service) continue;
+              this.setZone(x + dx, z + dz, tool.zoneType, false);
+              if (!c.building) {
+                this.spawnBuilding(x + dx, z + dz, tool.zoneType, 1);
+              } else if (c.building.zone === tool.zoneType && c.building.level < 5) {
+                c.building.level += 1;
+                c.building.height = 0.8 + c.building.level * 0.6;
+              }
+            }
+          }
+        }
         this.recomputeNetworksAndSimulation(true);
         return { success: true };
       }
 
       case 'buildings': {
-        // Direct building placement!
-        if (cell.terrain === 'water') {
-          return { success: false, message: 'Cannot build on water!' };
+        const footprint = (tool.buildingType === 'tech_megaplex_4x4' ? 4 : tool.buildingType.includes('2x2') ? 2 : size) as (1 | 2 | 4);
+        if (x + footprint > GRID_SIZE || z + footprint > GRID_SIZE) {
+          return { success: false, message: `Cannot place ${footprint}x${footprint} building out of city bounds!` };
         }
-        if (cell.road || cell.service) {
-          return { success: false, message: 'Tile occupied by road or service! Bulldoze first.' };
+
+        for (let dx = 0; dx < footprint; dx++) {
+          for (let dz = 0; dz < footprint; dz++) {
+            const c = this.getCell(x + dx, z + dz);
+            if (!c || c.terrain === 'water') {
+              return { success: false, message: 'Cannot build on water!' };
+            }
+            if (c.road || c.service || c.building) {
+              return { success: false, message: `Area for ${footprint}x${footprint} building is occupied! Bulldoze first.` };
+            }
+          }
         }
+
         const costKey = `bld_${tool.buildingType}`;
-        const cost = TOOL_COSTS[costKey] || 500;
+        const cost = TOOL_COSTS[costKey] || (footprint === 4 ? 18000 : footprint === 2 ? 3800 : 500);
         if (this.budget.treasury < cost) {
-          return { success: false, message: 'Insufficient funds for building!' };
+          return { success: false, message: `Insufficient funds! Need $${cost}` };
         }
 
         this.budget.treasury -= cost;
-        cell.zone = tool.zone;
-        const b = this.spawnBuilding(x, z, tool.zone, tool.level);
-        b.constructionProgress = 1.0;
+        const masterB = this.spawnBuilding(x, z, tool.zone, tool.level, footprint);
+        masterB.name = tool.buildingType.replace(/_/g, ' ').toUpperCase();
+        masterB.constructionProgress = 1.0;
+
+        for (let dx = 0; dx < footprint; dx++) {
+          for (let dz = 0; dz < footprint; dz++) {
+            const subCell = this.grid[x + dx][z + dz];
+            subCell.building = masterB;
+            subCell.zone = tool.zone;
+            subCell.road = null;
+            subCell.service = null;
+            subCell.hasTree = false;
+          }
+        }
+
         this.recomputeNetworksAndSimulation(true);
         return { success: true };
       }
 
       case 'utilities':
       case 'services': {
+        const footprint = (tool.serviceType === 'stadium' || tool.serviceType === 'university' || tool.serviceType === 'grand_park' || tool.serviceType === 'nuclear_plant' ? 4 : size === 2 || size === 4 ? size : 1) as (1 | 2 | 4);
+        if (x + footprint > GRID_SIZE || z + footprint > GRID_SIZE) {
+          return { success: false, message: `Cannot place out of city bounds!` };
+        }
+
+        for (let dx = 0; dx < footprint; dx++) {
+          for (let dz = 0; dz < footprint; dz++) {
+            const c = this.getCell(x + dx, z + dz);
+            if (!c || (c.terrain === 'water' && tool.serviceType !== 'sewage_plant')) {
+              return { success: false, message: 'Must be placed on land!' };
+            }
+            if (c.road || c.service || c.building) {
+              return { success: false, message: 'Area is occupied! Bulldoze first.' };
+            }
+          }
+        }
+
         const cost = TOOL_COSTS[tool.serviceType] || 5000;
         if (this.budget.treasury < cost) {
-          return { success: false, message: 'Insufficient funds!' };
+          return { success: false, message: `Insufficient funds! Need $${cost}` };
         }
-        if (cell.terrain === 'water' && tool.serviceType !== 'sewage_plant') {
-          return { success: false, message: 'Must be placed on land!' };
-        }
-        if (cell.road || cell.service || cell.building) {
-          return { success: false, message: 'Tile already occupied!' };
-        }
+
         this.budget.treasury -= cost;
-        this.placeService(x, z, tool.serviceType, true);
+        this.placeService(x, z, tool.serviceType, false);
+        const masterCell = this.grid[x][z];
+        if (masterCell.service && footprint > 1) {
+          masterCell.service.footprint = footprint;
+          masterCell.service.isMasterTile = true;
+          masterCell.service.masterCoord = { x, z };
+          for (let dx = 0; dx < footprint; dx++) {
+            for (let dz = 0; dz < footprint; dz++) {
+              const sc = this.grid[x + dx][z + dz];
+              sc.service = masterCell.service;
+              sc.building = null;
+              sc.road = null;
+              sc.hasTree = false;
+            }
+          }
+        }
+
+        this.recomputeNetworksAndSimulation(true);
         return { success: true };
       }
 
       case 'bulldoze': {
-        if (cell.road) {
-          cell.road = null;
+        let bulldozedAny = false;
+        for (let dx = 0; dx < size; dx++) {
+          for (let dz = 0; dz < size; dz++) {
+            const targetCell = this.getCell(x + dx, z + dz);
+            if (!targetCell) continue;
+
+            if (targetCell.building) {
+              const b = targetCell.building;
+              if (b.footprint && b.footprint > 1 && b.masterCoord) {
+                const fp = b.footprint;
+                const mx = b.masterCoord.x;
+                const mz = b.masterCoord.z;
+                for (let fx = 0; fx < fp; fx++) {
+                  for (let fz = 0; fz < fp; fz++) {
+                    const fc = this.getCell(mx + fx, mz + fz);
+                    if (fc) {
+                      fc.building = null;
+                      fc.zone = null;
+                    }
+                  }
+                }
+              } else {
+                targetCell.building = null;
+                targetCell.zone = null;
+              }
+              bulldozedAny = true;
+            }
+            if (targetCell.road) {
+              targetCell.road = null;
+              bulldozedAny = true;
+            }
+            if (targetCell.service) {
+              const s = targetCell.service;
+              if (s.footprint && s.footprint > 1 && s.masterCoord) {
+                const fp = s.footprint;
+                const mx = s.masterCoord.x;
+                const mz = s.masterCoord.z;
+                for (let fx = 0; fx < fp; fx++) {
+                  for (let fz = 0; fz < fp; fz++) {
+                    const fc = this.getCell(mx + fx, mz + fz);
+                    if (fc) fc.service = null;
+                  }
+                }
+              } else {
+                targetCell.service = null;
+              }
+              bulldozedAny = true;
+            }
+            if (targetCell.zone) {
+              targetCell.zone = null;
+              bulldozedAny = true;
+            }
+          }
+        }
+        if (bulldozedAny) {
           this.recalculateRoadConnections();
-          this.budget.treasury += 10;
-          return { success: true };
-        }
-        if (cell.building) {
-          cell.building = null;
-          return { success: true };
-        }
-        if (cell.service) {
-          cell.service = null;
-          return { success: true };
-        }
-        if (cell.zone) {
-          cell.zone = null;
+          this.recomputeNetworksAndSimulation(true);
           return { success: true };
         }
         return { success: false, message: 'Nothing to bulldoze here' };
@@ -803,6 +995,8 @@ export class CityManager {
       type,
       connections: { north: false, south: false, east: false, west: false },
       trafficDensity: 0.1,
+      carsPassed: 0,
+      totalEarnings: 0,
     };
     cell.zone = null;
     cell.building = null;
@@ -913,6 +1107,14 @@ export class CityManager {
       case 'university':
         radius = 18;
         effectValue = 50;
+        break;
+      case 'army_barracks':
+        radius = 14;
+        effectValue = 50;
+        break;
+      case 'defense_tower':
+        radius = 12;
+        effectValue = 60;
         break;
       case 'small_park':
         radius = 6;
@@ -1031,18 +1233,21 @@ export class CityManager {
     return { success: true, count: tilesToBuild.length, cost: totalCost };
   }
 
-  public spawnBuilding(x: number, z: number, zone: ZoneType, level = 1): BuildingData {
+  public spawnBuilding(x: number, z: number, zone: ZoneType, level = 1, footprint: 1 | 2 | 4 = 1): BuildingData {
     const cell = this.grid[x][z];
     const isHigh = level >= 3;
-    const maxResidents = zone === 'residential' ? level * (isHigh ? 24 : 6) : 0;
-    const maxWorkers = zone !== 'residential' ? level * (isHigh ? 30 : 8) : 0;
+    const mult = footprint * footprint;
+    const maxResidents = zone === 'residential' ? level * (isHigh ? 24 : 6) * mult : 0;
+    const maxWorkers = zone !== 'residential' ? level * (isHigh ? 30 : 8) * mult : 0;
 
     const orientations = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
     const rotation = orientations[Math.floor(Math.random() * orientations.length)];
 
     const building: BuildingData = {
       id: `bld_${++this.buildingIdCounter}`,
-      name: this.generateBuildingName(zone, level),
+      name: footprint > 1 
+        ? `${footprint}x${footprint} ${this.generateBuildingName(zone, level)}` 
+        : this.generateBuildingName(zone, level),
       zone,
       level,
       residents: Math.floor(maxResidents * 0.8),
@@ -1058,10 +1263,15 @@ export class CityManager {
       isAbandoned: false,
       abandonedTimer: 0,
       constructionProgress: 1.0,
+      hp: 100 * level * footprint,
+      maxHp: 100 * level * footprint,
       styleSeed: Math.floor(Math.random() * 1000),
-      height: 0.8 + level * 0.6,
-      taxIncome: level * (zone === 'residential' ? 18 : 26),
+      height: (0.8 + level * 0.6) * (footprint === 4 ? 1.8 : footprint === 2 ? 1.4 : 1.0),
+      taxIncome: level * (zone === 'residential' ? 18 : 26) * mult,
       rotation,
+      footprint,
+      isMasterTile: footprint > 1 ? true : undefined,
+      masterCoord: footprint > 1 ? { x, z } : undefined,
     };
 
     cell.building = building;
@@ -1106,6 +1316,8 @@ export class CityManager {
       this.weekAccumulator = 0;
       this.weeklyAccountingTick();
     }
+
+    this.updateWaveSystem(effectiveDelta);
   }
 
   // 60 FPS motion update for cars and pedestrians walking on sidewalks
@@ -1114,15 +1326,45 @@ export class CityManager {
     const effectiveDelta = deltaSeconds * this.stats.simulationSpeed;
     this.updateVehicles(effectiveDelta);
     this.updatePedestrians(effectiveDelta);
+    this.updateTowerDefense(effectiveDelta);
   }
 
   private simulationTick() {
+    if (this.waveActive) return; // City Lockdown!
+
     this.recomputeNetworksAndSimulation();
     this.handleBuildingGrowthAndDecay();
     this.updateDemands();
     this.checkMilestones();
     this.manageRealisticTraffic();
     this.manageRealisticPedestrians();
+    this.manageFireDepartment();
+    this.manageWasteManagement();
+  }
+
+  private updateWaveSystem(delta: number) {
+    if (this.waveActive) return;
+
+    this.waveTimer -= delta;
+
+    if (this.waveTimer <= 15 && !this.waveWarningTriggered) {
+      this.waveWarningTriggered = true;
+      if (this.onWaveEvent) {
+        this.onWaveEvent('warning', { countdown: Math.ceil(this.waveTimer), waveNumber: this.waveNumber + 1 });
+      }
+      if (this.onChirpTrigger) {
+        this.onChirpTrigger(
+          'warning',
+          `⚠️ RADAR ALERT: Raider militia wave ${this.waveNumber + 1} approaching from Highway in 15 seconds! Place army towers & barracks!`
+        );
+      }
+    }
+
+    if (this.waveTimer <= 0) {
+      this.startRaiderWave();
+      this.waveTimer = 120 + this.waveNumber * 20;
+      this.waveWarningTriggered = false;
+    }
   }
 
   public recomputeNetworksAndSimulation(forceFull = false) {
@@ -1828,6 +2070,7 @@ export class CityManager {
 
   // Realistic Traffic Simulation with Citizen Car Trips & Highway Gateway
   private manageRealisticTraffic() {
+    if (this.waveActive) return; // No traffic during lockdown!
     if (this.vehicles.length >= 36) return;
 
     // Collect home cells, work cells, shop cells, and highway gateway
@@ -1870,7 +2113,16 @@ export class CityManager {
           destRoad = this.findAdjacentRoad(pick[0], pick[1]);
         }
 
-        const colors = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#F3F4F6'];
+        const rollVariant = Math.random();
+        const modelVariant: CarModelVariant =
+          rollVariant < 0.35 ? 'sedan' : rollVariant < 0.65 ? 'suv' : rollVariant < 0.88 ? 'hatchback' : 'race_car';
+        
+        const colors = modelVariant === 'race_car'
+          ? ['#EF4444', '#06B6D4', '#FACC15', '#8B5CF6', '#10B981']
+          : modelVariant === 'suv'
+          ? ['#1E3A8A', '#374151', '#15803D', '#9A3412', '#4B5563']
+          : ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#E5E7EB', '#6366F1'];
+
         this.spawnCarOnRoad(
           startRoad[0],
           startRoad[1],
@@ -1878,13 +2130,14 @@ export class CityManager {
           colors[Math.floor(Math.random() * colors.length)],
           'car',
           undefined,
-          destRoad ? { x: destRoad[0], z: destRoad[1] } : undefined
+          destRoad ? { x: destRoad[0], z: destRoad[1] } : undefined,
+          modelVariant
         );
         this.stats.highwayCommuters++;
       }
     }
 
-    // 2. Spawning Resident Car from Home (Every citizen has a car, each car has a home!)
+    // 2. Spawning Resident Car / Transit from Home (Varied car models, taxis, buses, and trams)
     if (homeCells.length > 0 && Math.random() < 0.65) {
       const [hx, hz] = homeCells[Math.floor(Math.random() * homeCells.length)];
       const roadNearHome = this.findAdjacentRoad(hx, hz);
@@ -1893,15 +2146,30 @@ export class CityManager {
         // Decide trip purpose based on city amenities
         const roll = Math.random();
         let state: VehicleTripState = 'commuting_work';
-        let type: 'car' | 'taxi' | 'bus' = 'car';
+        let type: 'car' | 'taxi' | 'bus' | 'tram' = 'car';
         let targetCell: [number, number] | null = null;
 
-        if (roll < 0.50 && workCells.length > 0) {
+        if (roll < 0.45 && workCells.length > 0) {
           state = 'commuting_work';
+          // Occasionally public transit bus or tram commuters
+          if (Math.random() < 0.12) {
+            type = 'bus';
+          } else if (Math.random() < 0.08) {
+            type = 'tram';
+          }
           targetCell = workCells[Math.floor(Math.random() * workCells.length)];
-        } else if (roll < 0.85 && shopCells.length > 0) {
+        } else if (roll < 0.82 && shopCells.length > 0) {
           state = 'shopping';
-          type = Math.random() < 0.35 ? 'taxi' : 'car';
+          const shopRoll = Math.random();
+          if (shopRoll < 0.30) {
+            type = 'taxi';
+          } else if (shopRoll < 0.42) {
+            type = 'tram';
+          } else if (shopRoll < 0.52) {
+            type = 'bus';
+          } else {
+            type = 'car';
+          }
           targetCell = shopCells[Math.floor(Math.random() * shopCells.length)];
         } else if (gatewayCell) {
           // Leaving city on highway!
@@ -1914,15 +2182,40 @@ export class CityManager {
           destRoad = this.findAdjacentRoad(targetCell[0], targetCell[1]) || this.findNearestRoad(targetCell[0], targetCell[1]);
         }
 
-        const colors = ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#E5E7EB', '#8B5CF6'];
+        let carModel: CarModelVariant | undefined;
+        let carColor = '#3B82F6';
+
+        if (type === 'taxi') {
+          carColor = '#FACC15';
+          carModel = 'sedan';
+        } else if (type === 'bus') {
+          const busColors = ['#0284C7', '#10B981', '#F97316', '#6366F1'];
+          carColor = busColors[Math.floor(Math.random() * busColors.length)];
+        } else if (type === 'tram') {
+          const tramColors = ['#E11D48', '#0D9488', '#3B82F6', '#8B5CF6'];
+          carColor = tramColors[Math.floor(Math.random() * tramColors.length)];
+        } else {
+          const mRoll = Math.random();
+          carModel = mRoll < 0.35 ? 'sedan' : mRoll < 0.65 ? 'suv' : mRoll < 0.88 ? 'hatchback' : 'race_car';
+          const carColors = carModel === 'race_car'
+            ? ['#EF4444', '#06B6D4', '#FACC15', '#8B5CF6', '#10B981']
+            : carModel === 'suv'
+            ? ['#1E3A8A', '#374151', '#15803D', '#9A3412', '#475569']
+            : carModel === 'hatchback'
+            ? ['#FBBF24', '#14B8A6', '#F97316', '#38BDF8', '#A855F7']
+            : ['#EF4444', '#3B82F6', '#10B981', '#F59E0B', '#E5E7EB', '#6366F1'];
+          carColor = carColors[Math.floor(Math.random() * carColors.length)];
+        }
+
         this.spawnCarOnRoad(
           roadNearHome[0],
           roadNearHome[1],
           state,
-          type === 'taxi' ? '#FACC15' : colors[Math.floor(Math.random() * colors.length)],
+          carColor,
           type,
           { x: hx, z: hz },
-          destRoad ? { x: destRoad[0], z: destRoad[1] } : undefined
+          destRoad ? { x: destRoad[0], z: destRoad[1] } : undefined,
+          carModel
         );
       }
     }
@@ -1954,9 +2247,10 @@ export class CityManager {
     sz: number,
     state: VehicleTripState,
     color: string,
-    type: 'car' | 'taxi' | 'bus' | 'truck' = 'car',
+    type: 'car' | 'taxi' | 'bus' | 'truck' | 'tram' = 'car',
     homeCell?: { x: number; z: number },
-    destCell?: { x: number; z: number }
+    destCell?: { x: number; z: number },
+    modelVariant?: CarModelVariant
   ) {
     let route: [number, number][] | null = null;
     if (destCell) {
@@ -1968,13 +2262,14 @@ export class CityManager {
     if (route && route.length >= 2) {
       tx = route[1][0];
       tz = route[1][1];
-    } else {
+    }
+    if (tx === sx && tz === sz) {
       const neighbors = [
         [sx + 1, sz],
         [sx - 1, sz],
         [sx, sz + 1],
         [sx, sz - 1],
-      ].filter(([nx, nz]) => this.getCell(nx, nz)?.road !== null);
+      ].filter(([nx, nz]) => Boolean(this.getCell(nx, nz)?.road));
 
       if (neighbors.length === 0) return;
       const pick = neighbors[Math.floor(Math.random() * neighbors.length)];
@@ -1982,15 +2277,55 @@ export class CityManager {
       tz = pick[1];
     }
 
+    if (tx === sx && tz === sz) return; // Prevent 0-distance stationary vehicles
+
+    let resolvedVariant = modelVariant;
+    if (type === 'car' && !resolvedVariant) {
+      const roll = Math.random();
+      resolvedVariant = roll < 0.35 ? 'sedan' : roll < 0.65 ? 'suv' : roll < 0.88 ? 'hatchback' : 'race_car';
+    }
+
+    let speed = 1.5 + Math.random() * 0.3;
+    if (type === 'bus') {
+      speed = 1.1 + Math.random() * 0.15;
+    } else if (type === 'tram') {
+      speed = 1.25 + Math.random() * 0.15;
+    } else if (type === 'taxi') {
+      speed = 1.65 + Math.random() * 0.25;
+    } else if (resolvedVariant === 'race_car') {
+      speed = 2.2 + Math.random() * 0.4;
+    } else if (resolvedVariant === 'suv') {
+      speed = 1.35 + Math.random() * 0.2;
+    } else if (resolvedVariant === 'hatchback') {
+      speed = 1.55 + Math.random() * 0.25;
+    }
+
+    // Lane offsets for standard two-lane roads vs. 3-lane Avenue roads
+    const startCell = this.getCell(sx, sz);
+    const isAvenue = startCell?.road?.type === 'avenue';
+    let laneOffset = 0.22;
+    if (type === 'tram') {
+      laneOffset = 0.0; // Center track lane
+    } else if (type === 'bus') {
+      laneOffset = isAvenue ? 0.28 : 0.22; // Curbside transit lane
+    } else if (isAvenue) {
+      // 3 distinct lanes across Avenue width (left: -0.28, center: 0.0, right: +0.28)
+      const rollLane = Math.random();
+      laneOffset = rollLane < 0.33 ? -0.28 : rollLane < 0.66 ? 0.0 : 0.28;
+    } else {
+      laneOffset = 0.22;
+    }
+
     this.vehicles.push({
       id: `veh_${++this.vehicleIdCounter}`,
       type,
+      modelVariant: resolvedVariant,
       x: sx,
       z: sz,
       targetX: tx,
       targetZ: tz,
       rotation: Math.atan2(tx - sx, tz - sz),
-      speed: type === 'bus' ? 1.0 : 1.5 + Math.random() * 0.3,
+      speed,
       progress: 0,
       color,
       state,
@@ -2000,7 +2335,8 @@ export class CityManager {
       routeIndex: 0,
       isBlocked: false,
       dwellTimer: 0,
-      laneOffset: 0.34, // Tucked to the sidewalk sidelines so center road is clear
+      laneOffset,
+      wheelAngle: 0,
     });
   }
 
@@ -2017,36 +2353,13 @@ export class CityManager {
     for (let i = this.vehicles.length - 1; i >= 0; i--) {
       const v = this.vehicles[i];
 
-      // 2. Handle parked / dwelling cars at workplace or shopping center
+      // 2. Vehicles never stop or idle in the middle of a travel lane
       if (v.dwellTimer && v.dwellTimer > 0) {
-        v.dwellTimer -= delta;
-        if (v.dwellTimer <= 0) {
-          // Finished working / shopping! Commute back to home building!
-          if ((v.state === 'commuting_work' || v.state === 'shopping') && v.homeCell) {
-            const homeRoad = this.findAdjacentRoad(v.homeCell.x, v.homeCell.z);
-            if (homeRoad) {
-              const returnPath = this.findRoadPath(v.x, v.z, homeRoad[0], homeRoad[1]);
-              if (returnPath && returnPath.length >= 2) {
-                v.state = 'returning_home';
-                v.route = returnPath;
-                v.routeIndex = 0;
-                v.targetX = returnPath[1][0];
-                v.targetZ = returnPath[1][1];
-                v.rotation = Math.atan2(v.targetX - v.x, v.targetZ - v.z);
-                v.progress = 0;
-                continue;
-              }
-            }
-          }
-          // If no return path possible or finished home return, park car
-          this.vehicles.splice(i, 1);
-        }
+        this.vehicles.splice(i, 1);
         continue;
       }
 
-      // 3. Realistic Car-Following & Traffic Jam / Traffic Block detection:
-      // If a vehicle is directly ahead on the same road segment or destination, stop to prevent collision!
-      // Cars can overlap and go without waiting (no stopping for traffic lights or cars)
+      // 3. Realistic continuous traffic movement & speed calculation
       const speedMult = 1.0;
       v.isBlocked = false;
       v.blockedTimer = 0;
@@ -2057,8 +2370,10 @@ export class CityManager {
         roadCell.road.trafficDensity = Math.min(1.0, roadCell.road.trafficDensity + 0.15);
       }
 
-      // Advance car along the road
-      v.progress += delta * v.speed * speedMult;
+      // Advance car along the road & rotate wheels realistically
+      const moveDist = delta * v.speed * speedMult;
+      v.progress += moveDist;
+      v.wheelAngle = ((v.wheelAngle || 0) + (moveDist / 0.045)) % (Math.PI * 2);
 
       if (v.progress >= 1.0) {
         v.lastTile = [v.x, v.z];
@@ -2074,6 +2389,11 @@ export class CityManager {
 
         if (currentCell.road.type === 'toll_booth') {
           this.budget.treasury += 5; // Toll booth earnings!
+          currentCell.road.carsPassed = (currentCell.road.carsPassed || 0) + 1;
+          currentCell.road.totalEarnings = (currentCell.road.totalEarnings || 0) + 5;
+          if (Math.random() < 0.2) {
+            soundEngine.playTollChime();
+          }
         }
 
         // Highway exit reached
@@ -2093,51 +2413,102 @@ export class CityManager {
             continue;
           } else {
             // Reached destination!
-            if (v.state === 'returning_home') {
-              // Citizen has safely returned home! Park car.
+            if (v.type === 'firetruck' && v.destCell) {
+              const targetCell = this.getCell(v.destCell.x, v.destCell.z);
+              if (targetCell?.building && targetCell.building.onFire) {
+                targetCell.building.onFire = false;
+                targetCell.building.hp = targetCell.building.maxHp;
+                targetCell.building.isAbandoned = false;
+                soundEngine.playWater();
+                if (this.onChirpTrigger) {
+                  this.onChirpTrigger('happy', `🚒 Fire Department extinguished fire at ${targetCell.building.name}! Structure saved.`);
+                }
+              }
               this.vehicles.splice(i, 1);
               continue;
-            } else if (v.state === 'highway_exit') {
+            }
+            if (v.state === 'returning_home' || v.state === 'highway_exit') {
+              // Safely parked at home garage or exited city!
               this.vehicles.splice(i, 1);
               continue;
+            } else if (v.type === 'bus' || v.type === 'tram') {
+              // Public transit never stops in the middle of the road:
+              // Continuously circulate along the transit network!
+              v.route = undefined;
+              v.routeIndex = undefined;
             } else {
-              // Reached workplace or commercial shop: dwell for several seconds!
-              v.dwellTimer = 4.5 + Math.random() * 3.5;
+              // Regular cars reaching workplace or commercial shop:
+              // Citizens safely pull into the parking lot or garage (no road blocking!)
+              this.vehicles.splice(i, 1);
               continue;
             }
           }
         }
 
-        // Fallback: Pick next road tile while strictly AVOIDING looping in circles:
-        // Filter out immediate U-turn unless dead-end!
+        // Continuous Flow: Pick next road tile avoiding dead-ends and immediate U-turns
         const validNeighbors: [number, number][] = [];
         if (currentCell.road.connections.north) validNeighbors.push([v.x, v.z - 1]);
         if (currentCell.road.connections.south) validNeighbors.push([v.x, v.z + 1]);
         if (currentCell.road.connections.east) validNeighbors.push([v.x + 1, v.z]);
         if (currentCell.road.connections.west) validNeighbors.push([v.x - 1, v.z]);
 
+        // Fallback to any physically adjacent road if connections are transitioning
+        if (validNeighbors.length === 0) {
+          const adj = [
+            [v.x + 1, v.z],
+            [v.x - 1, v.z],
+            [v.x, v.z + 1],
+            [v.x, v.z - 1],
+          ];
+          for (const [ax, az] of adj) {
+            if (this.getCell(ax, az)?.road) {
+              validNeighbors.push([ax, az]);
+            }
+          }
+        }
+
         if (validNeighbors.length === 0) {
           this.vehicles.splice(i, 1);
           continue;
         }
 
-        // Exclude the tile we just arrived from to stop infinite back-and-forth bounce!
+        // Exclude the tile we just arrived from to prevent back-and-forth bounce
         const nonReverseNeighbors = validNeighbors.filter(
           (n) => !v.lastTile || n[0] !== v.lastTile[0] || n[1] !== v.lastTile[1]
         );
 
         const candidates = nonReverseNeighbors.length > 0 ? nonReverseNeighbors : validNeighbors;
-        // Pick pseudo-random candidate (not always index 0)
-        const next = candidates[Math.floor(Math.random() * candidates.length)];
+        const validCandidates = candidates.filter((c) => c[0] !== v.x || c[1] !== v.z);
+        if (validCandidates.length === 0) {
+          this.vehicles.splice(i, 1);
+          continue;
+        }
+
+        const next = validCandidates[Math.floor(Math.random() * validCandidates.length)];
         v.targetX = next[0];
         v.targetZ = next[1];
         v.rotation = Math.atan2(v.targetX - v.x, v.targetZ - v.z);
+
+        // Adjust lane offset for 3-lane Avenue
+        if (currentCell.road.type === 'avenue') {
+          if (v.type === 'tram') {
+            v.laneOffset = 0.0;
+          } else if (v.type === 'bus') {
+            v.laneOffset = 0.28;
+          } else if (Math.abs(v.laneOffset) < 0.05 || Math.abs(v.laneOffset) > 0.3) {
+            const rollLane = Math.random();
+            v.laneOffset = rollLane < 0.33 ? -0.28 : rollLane < 0.66 ? 0.0 : 0.28;
+          }
+        } else if (v.type !== 'tram') {
+          v.laneOffset = 0.22;
+        }
       }
     }
   }
 
   // Realistic Pedestrians (Humans walking on the sidewalks and visiting shops/parks)
   private manageRealisticPedestrians() {
+    if (this.waveActive) return; // No walking during lockdown!
     if (this.pedestrians.length >= 42) return;
 
     // Collect locations
@@ -2277,6 +2648,122 @@ export class CityManager {
     }
   }
 
+  private manageFireDepartment() {
+    if (this.waveActive) return;
+
+    for (let x = 0; x < GRID_SIZE; x++) {
+      for (let z = 0; z < GRID_SIZE; z++) {
+        const cell = this.grid[x][z];
+        if (cell.building && !cell.building.isAbandoned && !cell.building.onFire) {
+          const fireChance = cell.pollution > 60 ? 0.0025 : 0.0006;
+          if (Math.random() < fireChance) {
+            cell.building.onFire = true;
+            cell.building.isAbandoned = true;
+            if (this.onChirpTrigger) {
+              this.onChirpTrigger('warning', `🔥 FIRE EMERGENCY: Fire reported at ${cell.building.name} [${x}, ${z}]! Dispatching Fire Department.`);
+            }
+          }
+        }
+      }
+    }
+
+    const fireStations: [number, number][] = [];
+    const burningBuildings: [number, number][] = [];
+
+    for (let x = 0; x < GRID_SIZE; x++) {
+      for (let z = 0; z < GRID_SIZE; z++) {
+        const cell = this.grid[x][z];
+        if (cell.service && cell.service.type === 'fire_station' && cell.hasPower && cell.hasWater) {
+          fireStations.push([x, z]);
+        }
+        if (cell.building && cell.building.onFire) {
+          burningBuildings.push([x, z]);
+        }
+      }
+    }
+
+    if (fireStations.length === 0 || burningBuildings.length === 0) return;
+
+    for (const [bx, bz] of burningBuildings) {
+      const alreadyTargeted = this.vehicles.some(
+        (v) => v.type === 'firetruck' && v.destCell && v.destCell.x === bx && v.destCell.z === bz
+      );
+
+      if (!alreadyTargeted && this.vehicles.length < 48) {
+        let nearestStation = fireStations[0];
+        let minDist = Infinity;
+        for (const [fsx, fsz] of fireStations) {
+          const d = Math.hypot(fsx - bx, fsz - bz);
+          if (d < minDist) {
+            minDist = d;
+            nearestStation = [fsx, fsz];
+          }
+        }
+
+        const roadStart = this.findAdjacentRoad(nearestStation[0], nearestStation[1]) || [nearestStation[0], nearestStation[1]];
+        const roadDest = this.findAdjacentRoad(bx, bz) || [bx, bz];
+        const route = this.findRoadPath(roadStart[0], roadStart[1], roadDest[0], roadDest[1]);
+
+        if (route && route.length > 0) {
+          const startPt = route[0];
+          this.vehicles.push({
+            id: `firetruck_${Date.now()}_${Math.random()}`,
+            type: 'firetruck',
+            x: startPt[0],
+            z: startPt[1],
+            targetX: route[1] ? route[1][0] : startPt[0],
+            targetZ: route[1] ? route[1][1] : startPt[1],
+            rotation: 0,
+            speed: 1.9,
+            progress: 0,
+            color: '#dc2626',
+            state: 'roaming',
+            destCell: { x: bx, z: bz },
+            route,
+            routeIndex: 0,
+            laneOffset: 0.0,
+          });
+          soundEngine.playSiren();
+          if (this.onChirpTrigger) {
+            this.onChirpTrigger('news', `🚨 Fire engine dispatched from Fire Station to put out fire at [${bx}, ${bz}]!`);
+          }
+        }
+      }
+    }
+  }
+
+  private manageWasteManagement() {
+    const pop = this.stats.population;
+    const indCap = this.stats.industrialCapacity;
+    const comCap = this.stats.commercialCapacity;
+
+    const wasteGenerated = Math.round(pop * 0.7 + indCap * 1.5 + comCap * 0.8);
+
+    let wasteProcessed = 0;
+    for (let x = 0; x < GRID_SIZE; x++) {
+      for (let z = 0; z < GRID_SIZE; z++) {
+        const cell = this.grid[x][z];
+        if (cell.service && cell.hasPower && cell.hasWater) {
+          if (cell.service.type === 'recycling_center') {
+            wasteProcessed += 300;
+          } else if (cell.service.type === 'incinerator') {
+            wasteProcessed += 750;
+          }
+        }
+      }
+    }
+
+    const wasteCoverage = wasteGenerated > 0 ? Math.min(100, Math.round((wasteProcessed / wasteGenerated) * 100)) : 100;
+    this.stats.wasteGenerated = wasteGenerated;
+    this.stats.wasteProcessed = wasteProcessed;
+    this.stats.wasteCoverage = wasteCoverage;
+    this.stats.needsWaste = wasteCoverage;
+
+    if (wasteCoverage < 70 && wasteGenerated > 40 && Math.random() < 0.12 && this.onChirpTrigger) {
+      this.onChirpTrigger('concern', '⚠️ Garbage piling up! Build Recycling Centers or Incinerators to maintain clean waste management.');
+    }
+  }
+
   public expandMap(direction: 'south' | 'east' | 'west' = 'south') {
     const oldSize = this.grid.length;
     const expandBy = 12;
@@ -2322,6 +2809,662 @@ export class CityManager {
     this.grid = newGrid;
     if (direction === 'west') {
       this.highwayPortalCoord.x += expandBy;
+    }
+  }
+
+  public getDefenseStatus(): DefenseStatus {
+    let totalTowers = 0;
+    let totalBarracks = 0;
+    let totalTollBooths = 0;
+
+    for (let x = 0; x < GRID_SIZE; x++) {
+      for (let z = 0; z < GRID_SIZE; z++) {
+        const cell = this.grid[x][z];
+        if (cell.service?.type === 'defense_tower') totalTowers++;
+        if (cell.service?.type === 'army_barracks') totalBarracks++;
+        if (cell.road?.type === 'toll_booth') totalTollBooths++;
+      }
+    }
+
+    const nextWave = this.waveActive ? this.waveNumber : this.waveNumber + 1;
+    const surrenderPenalty = Math.max(1000, 500 * nextWave);
+    const victoryReward = 1200 * nextWave;
+    const bill = this.getCityDamageRepairBill();
+
+    return {
+      waveActive: this.waveActive,
+      waveNumber: this.waveNumber,
+      raidersRemaining: this.raidersRemaining,
+      totalRaidersInWave: this.totalRaidersInWave,
+      waveTimer: Math.max(0, this.waveTimer),
+      waveWarningActive: !this.waveActive && this.waveTimer <= 15,
+      surrenderPenalty,
+      victoryReward,
+      lastWaveResult: this.lastWaveResult,
+      lastWaveAmount: this.lastWaveAmount,
+      totalTowers,
+      totalBarracks,
+      totalTollBooths,
+      totalDamageIncurred: this.totalDamageIncurred,
+      currentRepairCost: bill.totalRepairCost,
+      damagedBuildingsCount: bill.damagedBuildingsCount,
+      burningBuildingsCount: bill.burningCount,
+    };
+  }
+
+  public getCityDamageRepairBill(): {
+    totalRepairCost: number;
+    damagedBuildingsCount: number;
+    burningCount: number;
+    abandonedCount: number;
+  } {
+    let totalRepairCost = 0;
+    let damagedBuildingsCount = 0;
+    let burningCount = 0;
+    let abandonedCount = 0;
+
+    for (let x = 0; x < GRID_SIZE; x++) {
+      for (let z = 0; z < GRID_SIZE; z++) {
+        const b = this.grid[x][z].building;
+        if (b) {
+          const maxHp = b.maxHp || 100;
+          const currentHp = b.hp !== undefined ? b.hp : maxHp;
+          const missingHp = Math.max(0, maxHp - currentHp);
+          let bldCost = 0;
+          if (missingHp > 1) {
+            bldCost += Math.round(missingHp * (8 + b.level * 4));
+          }
+          if (b.onFire) {
+            bldCost += 250;
+            burningCount++;
+          }
+          if (b.isAbandoned && missingHp > 0) {
+            bldCost += 200;
+            abandonedCount++;
+          }
+          if (bldCost > 0) {
+            totalRepairCost += bldCost;
+            damagedBuildingsCount++;
+          }
+        }
+      }
+    }
+
+    return { totalRepairCost, damagedBuildingsCount, burningCount, abandonedCount };
+  }
+
+  public repairAllDamagedBuildings(): {
+    success: boolean;
+    cost: number;
+    repairedCount: number;
+    message: string;
+  } {
+    const bill = this.getCityDamageRepairBill();
+    if (bill.totalRepairCost <= 0) {
+      return { success: true, cost: 0, repairedCount: 0, message: "All city buildings are intact!" };
+    }
+
+    if (this.budget.treasury < bill.totalRepairCost) {
+      return {
+        success: false,
+        cost: bill.totalRepairCost,
+        repairedCount: 0,
+        message: `Insufficient funds: Need $${bill.totalRepairCost.toLocaleString()} to repair city damage!`
+      };
+    }
+
+    this.budget.treasury -= bill.totalRepairCost;
+    this.damageRepairsPaid += bill.totalRepairCost;
+
+    let count = 0;
+    for (let x = 0; x < GRID_SIZE; x++) {
+      for (let z = 0; z < GRID_SIZE; z++) {
+        const b = this.grid[x][z].building;
+        if (b && ((b.hp !== undefined && b.hp < b.maxHp) || b.onFire || (b.isAbandoned && b.hp < b.maxHp))) {
+          b.hp = b.maxHp;
+          b.onFire = false;
+          b.isAbandoned = false;
+          b.abandonedTimer = 0;
+          count++;
+        }
+      }
+    }
+
+    soundEngine.playRepair();
+
+    if (this.onChirpTrigger) {
+      this.onChirpTrigger(
+        'happy',
+        `🛠️ City Public Works repaired ${count} damaged structures for $${bill.totalRepairCost.toLocaleString()}. Structural integrity restored!`
+      );
+    }
+
+    return {
+      success: true,
+      cost: bill.totalRepairCost,
+      repairedCount: count,
+      message: `Repaired ${count} structures for $${bill.totalRepairCost.toLocaleString()}`
+    };
+  }
+
+  public repairSingleBuilding(x: number, z: number): {
+    success: boolean;
+    cost: number;
+    message: string;
+  } {
+    const cell = this.getCell(x, z);
+    if (!cell || !cell.building) {
+      return { success: false, cost: 0, message: "No building found." };
+    }
+    const b = cell.building;
+    const maxHp = b.maxHp || 100;
+    const currentHp = b.hp !== undefined ? b.hp : maxHp;
+    const missingHp = Math.max(0, maxHp - currentHp);
+    let cost = Math.round(missingHp * (8 + b.level * 4));
+    if (b.onFire) cost += 250;
+    if (b.isAbandoned && missingHp > 0) cost += 200;
+    cost = Math.max(50, cost);
+
+    if (this.budget.treasury < cost) {
+      return { success: false, cost, message: `Need $${cost} to repair ${b.name}!` };
+    }
+
+    this.budget.treasury -= cost;
+    this.damageRepairsPaid += cost;
+    b.hp = b.maxHp;
+    b.onFire = false;
+    b.isAbandoned = false;
+    b.abandonedTimer = 0;
+
+    soundEngine.playRepair();
+
+    return { success: true, cost, message: `${b.name} restored to 100% integrity!` };
+  }
+
+  public triggerWaveNow() {
+    if (this.waveActive) return;
+    this.waveTimer = 0;
+    this.startRaiderWave();
+  }
+
+  private findRaiderPath(startX: number, startZ: number): [number, number][] {
+    const queue: [number, number, [number, number][]][] = [[startX, startZ, [[startX, startZ]]]];
+    const visited = new Set<string>();
+    visited.add(`${startX},${startZ}`);
+
+    let bestPath: [number, number][] = [[startX, startZ]];
+    let maxCityScore = -1;
+
+    while (queue.length > 0) {
+      const [cx, cz, path] = queue.shift()!;
+      if (path.length > 40) continue;
+
+      const cell = this.getCell(cx, cz);
+      let score = path.length;
+      if (cell?.building) score += 30;
+      if (cell?.road?.type === 'toll_booth') score += 20;
+      if (cell?.service) score += 25;
+
+      if (score > maxCityScore) {
+        maxCityScore = score;
+        bestPath = path;
+      }
+
+      const neighbors = [
+        [cx + 1, cz],
+        [cx - 1, cz],
+        [cx, cz + 1],
+        [cx, cz - 1],
+      ];
+
+      for (const [nx, nz] of neighbors) {
+        const key = `${nx},${nz}`;
+        if (visited.has(key)) continue;
+        const nCell = this.getCell(nx, nz);
+        if (!nCell || nCell.terrain === 'water') continue;
+        if (nCell.road) {
+          visited.add(key);
+          queue.push([nx, nz, [...path, [nx, nz]]]);
+        }
+      }
+    }
+
+    if (bestPath.length <= 2) {
+      const midX = Math.floor(GRID_SIZE / 2);
+      const midZ = Math.floor(GRID_SIZE / 2);
+      bestPath = [
+        [startX, startZ],
+        [Math.round((startX + midX) / 2), Math.round((startZ + midZ) / 2)],
+        [midX, midZ],
+      ];
+    }
+
+    return bestPath;
+  }
+
+  public startRaiderWave() {
+    if (this.waveActive) return;
+    this.waveNumber++;
+    this.waveActive = true;
+    this.lastWaveResult = null;
+    this.combatShots = [];
+
+    const count = 4 + this.waveNumber * 2;
+    this.totalRaidersInWave = count;
+    this.raidersRemaining = count;
+    this.raiders = [];
+    this.militiaUnits = [];
+
+    const portal = this.highwayPortalCoord || { x: 8, z: 0 };
+    const route = this.findRaiderPath(portal.x, portal.z);
+
+    const unitTypes: ('technical' | 'buggy' | 'armored_van' | 'infantry')[] = [
+      'technical',
+      'buggy',
+      'armored_van',
+      'infantry',
+    ];
+
+    for (let i = 0; i < count; i++) {
+      const uType = unitTypes[i % unitTypes.length];
+      const baseHp = uType === 'armored_van' ? 320 : uType === 'technical' ? 180 : uType === 'buggy' ? 130 : 90;
+      const baseSpeed = uType === 'buggy' ? 1.6 : uType === 'technical' ? 1.3 : uType === 'armored_van' ? 0.95 : 0.85;
+
+      const startPt = route[0] || [portal.x, portal.z];
+      const nextPt = route[1] || [portal.x, portal.z + 1];
+
+      this.raiders.push({
+        id: `raider_${Date.now()}_${i}`,
+        type: uType,
+        x: startPt[0] - (nextPt[0] - startPt[0]) * (i * 0.45),
+        z: startPt[1] - (nextPt[1] - startPt[1]) * (i * 0.45),
+        targetX: nextPt[0],
+        targetZ: nextPt[1],
+        rotation: Math.atan2(nextPt[0] - startPt[0], nextPt[1] - startPt[1]),
+        progress: 0,
+        hp: baseHp + this.waveNumber * 35,
+        maxHp: baseHp + this.waveNumber * 35,
+        speed: baseSpeed + Math.random() * 0.2,
+        laneOffset: i % 2 === 0 ? 0.20 : -0.20,
+        route,
+        routeIndex: 0,
+      });
+    }
+
+    // Deploy Militia units from all Army Barracks
+    for (let x = 0; x < GRID_SIZE; x++) {
+      for (let z = 0; z < GRID_SIZE; z++) {
+        const s = this.grid[x][z].service;
+        if (s && s.type === 'army_barracks') {
+          for (let m = 0; m < 3; m++) {
+            const mType = m === 0 ? 'patrol_jeep' : 'enforcer';
+            this.militiaUnits.push({
+              id: `militia_${Date.now()}_${x}_${z}_${m}`,
+              type: mType,
+              x,
+              z,
+              targetX: portal.x,
+              targetZ: portal.z,
+              rotation: 0,
+              progress: 0,
+              hp: mType === 'patrol_jeep' ? 220 : 120,
+              maxHp: mType === 'patrol_jeep' ? 220 : 120,
+              speed: mType === 'patrol_jeep' ? 1.4 : 0.9,
+              laneOffset: -0.20,
+              barracksCoord: { x, z },
+            });
+          }
+        }
+      }
+    }
+
+    soundEngine.playSiren();
+
+    if (this.onWaveEvent) {
+      this.onWaveEvent('start', {
+        waveNumber: this.waveNumber,
+        count,
+        surrenderPenalty: Math.max(1000, 500 * this.waveNumber),
+      });
+    }
+
+    if (this.onChirpTrigger) {
+      this.onChirpTrigger(
+        'warning',
+        `🚨 CITY LOCKDOWN ACTIVATED! Wave ${this.waveNumber} (${count} hostile vehicles/militia) breached highway! Defense towers engaging!`
+      );
+    }
+  }
+
+  public surrenderWave() {
+    if (!this.waveActive) return;
+    const penalty = Math.max(1000, 500 * this.waveNumber);
+    this.budget.treasury = Math.max(0, this.budget.treasury - penalty);
+    this.waveActive = false;
+    this.lastWaveResult = 'surrender';
+    this.lastWaveAmount = penalty;
+    this.waveTimer = 90 + this.waveNumber * 15;
+    this.waveWarningTriggered = false;
+    this.raiders = [];
+    this.militiaUnits = [];
+    this.combatShots = [];
+    soundEngine.playAlert();
+
+    if (this.onWaveEvent) {
+      this.onWaveEvent('surrender', { penalty, waveNumber: this.waveNumber });
+    }
+
+    if (this.onChirpTrigger) {
+      this.onChirpTrigger(
+        'warning',
+        `🏳️ City surrendered to raiders for Wave ${this.waveNumber}. Paid $${penalty.toLocaleString()} indemnity from treasury. Hostiles retreating.`
+      );
+    }
+  }
+
+  public updateTowerDefense(delta: number) {
+    // 1. Decay active combat tracer shots
+    for (let i = this.combatShots.length - 1; i >= 0; i--) {
+      this.combatShots[i].life -= delta * 3.0;
+      if (this.combatShots[i].life <= 0) {
+        this.combatShots.splice(i, 1);
+      }
+    }
+
+    if (!this.waveActive) return;
+
+    // 2. Defense Towers Attack Raiders
+    for (let x = 0; x < GRID_SIZE; x++) {
+      for (let z = 0; z < GRID_SIZE; z++) {
+        const s = this.grid[x][z].service;
+        if (s && s.type === 'defense_tower') {
+          let closestR: RaiderEntity | null = null;
+          let closestDist = 7.0; // Tower attack radius
+
+          for (const r of this.raiders) {
+            const dist = Math.hypot(r.x - x, r.z - z);
+            if (dist < closestDist) {
+              closestDist = dist;
+              closestR = r;
+            }
+          }
+
+          if (closestR) {
+            const dmg = delta * 85;
+            closestR.hp -= dmg;
+
+            if (Math.random() < 0.35) {
+              if (Math.random() < 0.15) soundEngine.playLaserShot();
+              this.combatShots.push({
+                id: `shot_${Date.now()}_${Math.random()}`,
+                fromX: x + 0.5,
+                fromY: 0.85,
+                fromZ: z + 0.5,
+                toX: closestR.x + 0.5,
+                toY: 0.25,
+                toZ: closestR.z + 0.5,
+                type: 'tower_laser',
+                life: 1.0,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // 3. Toll Booth Defense: Automated security guns + barrier chokepoint
+    // Raiders pass through like vehicles while taking defensive fire!
+    for (let x = 0; x < GRID_SIZE; x++) {
+      for (let z = 0; z < GRID_SIZE; z++) {
+        const r = this.grid[x][z].road;
+        if (r && r.type === 'toll_booth') {
+          let closestR: RaiderEntity | null = null;
+          let closestDist = 4.2;
+
+          for (const raider of this.raiders) {
+            const dist = Math.hypot(raider.x - x, raider.z - z);
+            if (dist < closestDist) {
+              closestDist = dist;
+              closestR = raider;
+            }
+            // Barrier chokepoint: raiders slow slightly when passing toll plaza
+            if (dist < 1.4) {
+              raider.speed = Math.min(raider.speed, 0.65);
+            }
+          }
+
+          if (closestR && Math.random() < 0.25) {
+            closestR.hp -= delta * 50;
+            if (Math.random() < 0.15) soundEngine.playLaserShot();
+            this.combatShots.push({
+              id: `toll_shot_${Date.now()}_${Math.random()}`,
+              fromX: x + 0.5,
+              fromY: 0.75,
+              fromZ: z + 0.5,
+              toX: closestR.x + 0.5,
+              toY: 0.25,
+              toZ: closestR.z + 0.5,
+              type: 'toll_turret',
+              life: 1.0,
+            });
+          }
+        }
+      }
+    }
+
+    // 4. Militia Attack Raiders
+    for (const m of this.militiaUnits) {
+      let targetRaider: RaiderEntity | null = null;
+      let minDist = 4.5;
+
+      for (const r of this.raiders) {
+        const dist = Math.hypot(m.x - r.x, m.z - r.z);
+        if (dist < minDist) {
+          minDist = dist;
+          targetRaider = r;
+        }
+      }
+
+      if (targetRaider) {
+        m.targetRaiderId = targetRaider.id;
+        targetRaider.hp -= delta * 45;
+        if (Math.random() < 0.2) {
+          if (Math.random() < 0.15) soundEngine.playRaiderShot();
+          this.combatShots.push({
+            id: `mshot_${Date.now()}_${Math.random()}`,
+            fromX: m.x + 0.5,
+            fromY: 0.22,
+            fromZ: m.z + 0.5,
+            toX: targetRaider.x + 0.5,
+            toY: 0.22,
+            toZ: targetRaider.z + 0.5,
+            type: 'militia_bullet',
+            life: 1.0,
+          });
+        }
+        m.x += Math.sign(targetRaider.x - m.x) * delta * m.speed * 0.3;
+        m.z += Math.sign(targetRaider.z - m.z) * delta * m.speed * 0.3;
+        m.rotation = Math.atan2(targetRaider.x - m.x, targetRaider.z - m.z);
+      } else if (this.raiders.length > 0) {
+        const firstR = this.raiders[0];
+        m.x += Math.sign(firstR.x - m.x) * delta * m.speed * 0.4;
+        m.z += Math.sign(firstR.z - m.z) * delta * m.speed * 0.4;
+        m.rotation = Math.atan2(firstR.x - m.x, firstR.z - m.z);
+      }
+    }
+
+    // 5. Update Raiders: Movement & Shooting at Buildings
+    // Raiders travel like normal vehicles through tolls & traffic, only exploding when HP hits 0!
+    for (let i = this.raiders.length - 1; i >= 0; i--) {
+      const r = this.raiders[i];
+
+      // True destruction: only explodes when shot down!
+      if (r.hp <= 0) {
+        soundEngine.playExplosion();
+        this.destroyedRaiderIds.add(r.id);
+        this.raiders.splice(i, 1);
+        this.raidersRemaining = Math.max(0, this.raidersRemaining - 1);
+        this.budget.treasury += 60 + this.waveNumber * 15;
+        continue;
+      }
+
+      let attackingBuilding = false;
+      let targetBldCoord: { x: number; z: number } | null = null;
+
+      for (let dx = -2; dx <= 2; dx++) {
+        for (let dz = -2; dz <= 2; dz++) {
+          const bx = Math.round(r.x) + dx;
+          const bz = Math.round(r.z) + dz;
+          const c = this.getCell(bx, bz);
+          if (c && c.building && !c.building.isAbandoned) {
+            attackingBuilding = true;
+            targetBldCoord = { x: bx, z: bz };
+            const dmg = delta * 18;
+            c.building.hp -= dmg;
+            const dollarCost = Math.round(dmg * (8 + c.building.level * 4));
+            this.totalDamageIncurred += dollarCost;
+
+            if (c.building.hp <= 0) {
+              c.building.hp = 0;
+              c.building.onFire = true;
+              c.building.isAbandoned = true;
+            }
+
+            if (Math.random() < 0.18) {
+              if (Math.random() < 0.15) soundEngine.playRaiderShot();
+              this.combatShots.push({
+                id: `rshot_${Date.now()}_${Math.random()}`,
+                fromX: r.x + 0.5,
+                fromY: 0.25,
+                fromZ: r.z + 0.5,
+                toX: bx + 0.5,
+                toY: 0.5,
+                toZ: bz + 0.5,
+                type: r.type === 'armored_van' ? 'raider_rocket' : 'raider_bullet',
+                life: 1.0,
+              });
+            }
+            break;
+          }
+        }
+        if (attackingBuilding) break;
+      }
+
+      r.isAttackingBuilding = attackingBuilding;
+      r.attackTargetCoord = targetBldCoord || undefined;
+
+      const moveSpeed = attackingBuilding ? r.speed * 0.45 : r.speed;
+      r.progress += delta * moveSpeed * 0.45;
+
+      if (r.progress >= 1.0) {
+        r.lastTile = [r.x, r.z];
+        r.x = r.targetX;
+        r.z = r.targetZ;
+        r.progress = 0;
+
+        if (r.route && r.routeIndex !== undefined) {
+          r.routeIndex++;
+          if (r.routeIndex < r.route.length - 1) {
+            const nextCoord = r.route[r.routeIndex + 1];
+            r.targetX = nextCoord[0];
+            r.targetZ = nextCoord[1];
+            r.rotation = Math.atan2(r.targetX - r.x, r.targetZ - r.z);
+            continue;
+          } else {
+            // Reached destination of initial route:
+            // Do NOT explode! Transition into continuous city road cruising like normal vehicles!
+            r.route = undefined;
+            r.routeIndex = undefined;
+          }
+        }
+
+        // Continuous Road Cruising: traverse connected city roads seamlessly
+        const currentCell = this.getCell(r.x, r.z);
+        const validNeighbors: [number, number][] = [];
+        if (currentCell?.road) {
+          const conn = currentCell.road.connections;
+          if (conn.north && this.getCell(r.x, r.z - 1)?.road) validNeighbors.push([r.x, r.z - 1]);
+          if (conn.south && this.getCell(r.x, r.z + 1)?.road) validNeighbors.push([r.x, r.z + 1]);
+          if (conn.east && this.getCell(r.x + 1, r.z)?.road) validNeighbors.push([r.x + 1, r.z]);
+          if (conn.west && this.getCell(r.x - 1, r.z)?.road) validNeighbors.push([r.x - 1, r.z]);
+        }
+
+        if (validNeighbors.length === 0) {
+          const adj = [
+            [r.x + 1, r.z],
+            [r.x - 1, r.z],
+            [r.x, r.z + 1],
+            [r.x, r.z - 1],
+          ];
+          for (const [ax, az] of adj) {
+            if (this.getCell(ax, az)?.road) validNeighbors.push([ax, az]);
+          }
+        }
+
+        if (validNeighbors.length > 0) {
+          const nonReverse = validNeighbors.filter(
+            (n) => !r.lastTile || n[0] !== r.lastTile[0] || n[1] !== r.lastTile[1]
+          );
+          const candidates = nonReverse.length > 0 ? nonReverse : validNeighbors;
+          const next = candidates[Math.floor(Math.random() * candidates.length)];
+          r.targetX = next[0];
+          r.targetZ = next[1];
+          r.rotation = Math.atan2(r.targetX - r.x, r.targetZ - r.z);
+        } else {
+          // Off-road fallback roaming toward municipal center
+          const targetX = Math.floor(GRID_SIZE / 2);
+          const targetZ = Math.floor(GRID_SIZE / 2);
+          r.targetX = r.x + Math.sign(targetX - r.x);
+          r.targetZ = r.z + Math.sign(targetZ - r.z);
+          r.rotation = Math.atan2(r.targetX - r.x, r.targetZ - r.z);
+        }
+      }
+    }
+
+    // 6. Defeat check: city treasury exhausted to 0 while under raid
+    if (this.budget.treasury <= 0 && this.waveActive && this.raiders.length > 0) {
+      const penalty = Math.max(1000, 500 * this.waveNumber);
+      this.waveActive = false;
+      this.lastWaveResult = 'defeat';
+      this.lastWaveAmount = penalty;
+      this.waveTimer = 90 + this.waveNumber * 15;
+      this.waveWarningTriggered = false;
+      this.raiders = [];
+      this.militiaUnits = [];
+      this.combatShots = [];
+      soundEngine.playAlert();
+      if (this.onChirpTrigger) {
+        this.onChirpTrigger(
+          'warning',
+          `💥 CITY OVERRUN! Wave ${this.waveNumber} looted municipal reserves! Construct more Defense Towers along roads.`
+        );
+      }
+      return;
+    }
+
+    // 7. Victory check: All raiders defeated!
+    if (this.raiders.length === 0 || this.raidersRemaining === 0) {
+      this.waveActive = false;
+      this.lastWaveResult = 'victory';
+      const reward = 1200 * this.waveNumber;
+      this.lastWaveAmount = reward;
+      this.budget.treasury += reward;
+      this.waveTimer = 90 + this.waveNumber * 15;
+      this.waveWarningTriggered = false;
+      this.combatShots = [];
+      this.militiaUnits = [];
+      soundEngine.playVictory();
+
+      if (this.onWaveEvent) {
+        this.onWaveEvent('victory', { reward, waveNumber: this.waveNumber });
+      }
+
+      if (this.onChirpTrigger) {
+        this.onChirpTrigger(
+          'happy',
+          `🛡️ VICTORY! Wave ${this.waveNumber} successfully repelled! City defense bonus +$${reward.toLocaleString()} deposited to treasury.`
+        );
+      }
     }
   }
 }

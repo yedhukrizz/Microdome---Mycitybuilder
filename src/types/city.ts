@@ -8,7 +8,12 @@ export type DirectBuildingType =
   | 'corner_store'
   | 'commercial_center'
   | 'clean_factory'
-  | 'tech_office';
+  | 'tech_office'
+  | 'condo_complex_2x2'
+  | 'mall_galleria_2x2'
+  | 'logistics_hub_2x2'
+  | 'corporate_plaza_2x2'
+  | 'tech_megaplex_4x4';
 
 export type ServiceType = 
   | 'wind_turbine'
@@ -37,18 +42,20 @@ export type ServiceType =
   | 'bus_station'
   | 'subway_station'
   | 'tram_depot'
+  | 'army_barracks'
+  | 'defense_tower'
   | 'forest';
 
 export type ToolCategory = 'inspect' | 'roads' | 'zones' | 'buildings' | 'utilities' | 'services' | 'bulldoze';
 
 export type ActiveTool = 
-  | { category: 'inspect' }
-  | { category: 'bulldoze' }
-  | { category: 'roads'; roadType: RoadType }
-  | { category: 'zones'; zoneType: ZoneType | 'dezone' }
-  | { category: 'buildings'; buildingType: DirectBuildingType; zone: ZoneType; level: number }
-  | { category: 'utilities'; serviceType: 'wind_turbine' | 'solar_farm' | 'coal_plant' | 'nuclear_plant' | 'geothermal_plant' | 'fusion_reactor' | 'water_tower' | 'sewage_plant' | 'desalination_plant' }
-  | { category: 'services'; serviceType: 'clinic' | 'hospital' | 'fire_station' | 'police_station' | 'elementary_school' | 'university' | 'small_park' | 'medium_park' | 'large_park' | 'grand_park' | 'stadium' | 'parking_lot' | 'bus_station' | 'subway_station' | 'tram_depot' | 'recycling_center' | 'incinerator' | 'forest' };
+  | { category: 'inspect'; size?: 1 | 2 | 4 }
+  | { category: 'bulldoze'; size?: 1 | 2 | 4 }
+  | { category: 'roads'; roadType: RoadType; size?: 1 | 2 | 4 }
+  | { category: 'zones'; zoneType: ZoneType | 'dezone'; size?: 1 | 2 | 4 }
+  | { category: 'buildings'; buildingType: DirectBuildingType; zone: ZoneType; level: number; size?: 1 | 2 | 4 }
+  | { category: 'utilities'; serviceType: 'wind_turbine' | 'solar_farm' | 'coal_plant' | 'nuclear_plant' | 'geothermal_plant' | 'fusion_reactor' | 'water_tower' | 'sewage_plant' | 'desalination_plant'; size?: 1 | 2 | 4 }
+  | { category: 'services'; serviceType: 'clinic' | 'hospital' | 'fire_station' | 'police_station' | 'elementary_school' | 'university' | 'small_park' | 'medium_park' | 'large_park' | 'grand_park' | 'stadium' | 'parking_lot' | 'bus_station' | 'subway_station' | 'tram_depot' | 'army_barracks' | 'defense_tower' | 'recycling_center' | 'incinerator' | 'forest'; size?: 1 | 2 | 4 };
 
 export type OverlayMode = 'none' | 'electricity' | 'water' | 'land_value' | 'pollution' | 'traffic';
 
@@ -65,6 +72,8 @@ export interface RoadData {
   congestionLevel?: number;
   isHighwayGateway?: boolean; // Regional external highway connection
   gatewayDirection?: 'inbound' | 'outbound' | 'bidirectional';
+  carsPassed?: number;
+  totalEarnings?: number;
 }
 
 export interface BuildingData {
@@ -85,11 +94,16 @@ export interface BuildingData {
   isAbandoned: boolean;
   abandonedTimer: number; // seconds without power/water
   constructionProgress: number; // 0 to 1 (1 = fully built)
+  hp: number;
+  maxHp: number;
   styleSeed: number;
   height: number;
   taxIncome: number;
   ownedCarIds?: string[];
   rotation?: number; // 0, PI/2, PI, 3PI/2 radians
+  footprint?: 1 | 2 | 4;
+  isMasterTile?: boolean;
+  masterCoord?: { x: number; z: number };
 }
 
 export interface ServiceData {
@@ -103,6 +117,9 @@ export interface ServiceData {
   effectValue: number;
   styleSeed: number;
   rotation?: number;
+  footprint?: 1 | 2 | 4;
+  isMasterTile?: boolean;
+  masterCoord?: { x: number; z: number };
 }
 
 export interface CellData {
@@ -133,9 +150,12 @@ export type VehicleTripState =
   | 'highway_exit'
   | 'roaming';
 
+export type CarModelVariant = 'sedan' | 'suv' | 'hatchback' | 'race_car';
+
 export interface Vehicle {
   id: string;
-  type: 'car' | 'taxi' | 'bus' | 'truck' | 'firetruck';
+  type: 'car' | 'taxi' | 'bus' | 'truck' | 'firetruck' | 'garbage_truck' | 'tram';
+  modelVariant?: CarModelVariant;
   x: number;
   z: number;
   targetX: number;
@@ -156,6 +176,7 @@ export interface Vehicle {
   parkingLotCell?: { x: number; z: number; stallIndex?: number };
   lastTile?: [number, number];
   laneOffset: number; // Right-hand side lane offset (-0.18 or +0.18)
+  wheelAngle?: number; // In radians for wheel rotation animation
 }
 
 export interface Pedestrian {
@@ -291,6 +312,10 @@ export interface CityStats {
   needsJobs: number; // % employment fulfillment
   needsTaxSatisfaction: number; // % satisfaction with tax rate
   needsEnvironment: number; // % clean air & low pollution
+  wasteGenerated: number;
+  wasteProcessed: number;
+  wasteCoverage: number;
+  needsWaste: number;
 }
 
 export interface CityHistorySnapshot {
@@ -327,4 +352,77 @@ export interface CityHistorySnapshot {
   waterConsumption?: number;
   citizenInflow?: number;
   citizenOutflow?: number;
+}
+
+export type RaiderUnitType = 'technical' | 'buggy' | 'armored_van' | 'infantry';
+export type MilitiaUnitType = 'patrol_jeep' | 'enforcer';
+
+export interface RaiderEntity {
+  id: string;
+  type: RaiderUnitType;
+  x: number;
+  z: number;
+  targetX: number;
+  targetZ: number;
+  rotation: number;
+  progress: number;
+  hp: number;
+  maxHp: number;
+  speed: number;
+  laneOffset?: number; // Lane offset so raiders pass normal vehicles smoothly
+  lastTile?: [number, number];
+  route?: [number, number][];
+  routeIndex?: number;
+  isAttackingBuilding?: boolean;
+  attackTargetCoord?: { x: number; z: number };
+}
+
+export interface MilitiaEntity {
+  id: string;
+  type: MilitiaUnitType;
+  x: number;
+  z: number;
+  targetX: number;
+  targetZ: number;
+  rotation: number;
+  progress: number;
+  hp: number;
+  maxHp: number;
+  speed: number;
+  laneOffset?: number;
+  barracksCoord?: { x: number; z: number };
+  targetRaiderId?: string;
+}
+
+export interface CombatShot {
+  id: string;
+  fromX: number;
+  fromY: number;
+  fromZ: number;
+  toX: number;
+  toY: number;
+  toZ: number;
+  type: 'tower_laser' | 'tower_bullet' | 'raider_bullet' | 'raider_rocket' | 'militia_bullet' | 'toll_turret';
+  life: number; // 0 to 1
+}
+
+export interface DefenseStatus {
+  waveActive: boolean;
+  waveNumber: number;
+  raidersRemaining: number;
+  totalRaidersInWave: number;
+  waveTimer: number; // Seconds until next wave
+  waveWarningActive: boolean;
+  surrenderPenalty: number;
+  victoryReward: number;
+  lastWaveResult: 'victory' | 'surrender' | 'defeat' | null;
+  lastWaveAmount: number;
+  totalTowers: number;
+  totalBarracks: number;
+  totalTollBooths: number;
+  // Damage & Repair accounting
+  totalDamageIncurred: number;
+  currentRepairCost: number;
+  damagedBuildingsCount: number;
+  burningBuildingsCount: number;
 }

@@ -19,13 +19,16 @@ import {
   DollarSign,
   Eye,
   EyeOff,
+  ShieldAlert,
+  Radio,
 } from 'lucide-react';
-import { CityBudget, CityStats } from '../types/city';
+import { CityBudget, CityStats, DefenseStatus } from '../types/city';
 import { useTheme } from '../context/ThemeContext';
 
 interface TopBarProps {
   stats: CityStats;
   budget: CityBudget;
+  defenseStatus?: DefenseStatus;
   activeModal: string | null;
   setActiveModal: (modal: string | null) => void;
   onSpeedChange: (speed: number) => void;
@@ -38,6 +41,7 @@ interface TopBarProps {
 export const TopBar: React.FC<TopBarProps> = ({
   stats,
   budget,
+  defenseStatus,
   activeModal,
   setActiveModal,
   onSpeedChange,
@@ -84,6 +88,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   const navItems = [
     { id: 'overview', label: 'Overview', icon: Building2, desc: 'Utilities & Needs' },
     { id: 'economy', label: 'Economy', icon: TrendingUp, desc: 'Budget & Taxes' },
+    { id: 'defense', label: 'Defenses', icon: ShieldAlert, desc: 'Radar & Militia Waves' },
     { id: 'milestones', label: 'Goals', icon: Award, desc: 'Milestones' },
     { id: 'graphs', label: 'Graphs', icon: BarChart3, desc: 'City Analytics' },
     { id: 'settings', label: 'Settings', icon: Sliders, desc: 'Theme, Graphics & Maps' },
@@ -143,7 +148,11 @@ export const TopBar: React.FC<TopBarProps> = ({
                   type="button"
                   onClick={() => handleSelectNav(item.id)}
                   className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] transition-all cursor-pointer font-medium ${
-                    isActive
+                    item.id === 'defense' && defenseStatus?.waveActive
+                      ? 'bg-red-600 text-white font-bold animate-pulse shadow-md shadow-red-600/40'
+                      : item.id === 'defense' && defenseStatus?.waveWarningActive
+                      ? 'bg-amber-600 text-white font-bold animate-pulse shadow-md shadow-amber-600/40'
+                      : isActive
                       ? isLight
                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 font-semibold shadow-xs'
                         : 'bg-emerald-950/60 text-emerald-400 border border-emerald-500/40 font-semibold shadow-xs'
@@ -153,9 +162,20 @@ export const TopBar: React.FC<TopBarProps> = ({
                   }`}
                 >
                   <item.icon className="w-3 h-3" />
-                  <span>{item.label}</span>
+                  <span>
+                    {item.id === 'defense' && defenseStatus?.waveActive
+                      ? `🚨 Lockdown (${defenseStatus.raidersRemaining})`
+                      : item.id === 'defense' && defenseStatus?.waveWarningActive
+                      ? `⚠️ Raid (${Math.ceil(defenseStatus.waveTimer)}s)`
+                      : item.label}
+                  </span>
                   {item.id === 'overview' && hasGridAlert && (
                     <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse ml-0.5" />
+                  )}
+                  {item.id === 'defense' && !defenseStatus?.waveActive && defenseStatus?.waveNumber && defenseStatus.waveNumber > 0 && (
+                    <span className="text-[9px] px-1 py-0.2 rounded bg-black/20 font-mono">
+                      W{defenseStatus.waveNumber}
+                    </span>
                   )}
                 </button>
               );

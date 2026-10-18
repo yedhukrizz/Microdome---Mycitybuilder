@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Zap, Droplets, Smile, DollarSign, Users, Briefcase, Trash2, ArrowUpCircle } from 'lucide-react';
+import { X, Zap, Droplets, Smile, DollarSign, Users, Briefcase, Trash2, ArrowUpCircle, Wrench, Hammer, Flame, Shield } from 'lucide-react';
 import { CellData } from '../types/city';
 import { useTheme } from '../context/ThemeContext';
 
@@ -7,12 +7,14 @@ interface InspectorModalProps {
   cell: CellData;
   onClose: () => void;
   onBulldoze: (x: number, z: number) => void;
+  onRepairBuilding?: (x: number, z: number) => void;
 }
 
 export const InspectorModal: React.FC<InspectorModalProps> = ({
   cell,
   onClose,
   onBulldoze,
+  onRepairBuilding,
 }) => {
   const { theme } = useTheme();
   const isLight = theme === 'light';
@@ -20,6 +22,13 @@ export const InspectorModal: React.FC<InspectorModalProps> = ({
   const b = cell.building;
   const s = cell.service;
   const r = cell.road;
+
+  const maxHp = b?.maxHp || 100;
+  const currentHp = b?.hp !== undefined ? Math.max(0, Math.round(b.hp)) : maxHp;
+  const isDamaged = b && (currentHp < maxHp || b.onFire);
+  const missingHp = Math.max(0, maxHp - currentHp);
+  let singleRepairCost = b ? Math.round(missingHp * (8 + b.level * 4) + (b.onFire ? 250 : 0) + (b.isAbandoned && missingHp > 0 ? 200 : 0)) : 0;
+  singleRepairCost = Math.max(isDamaged ? 50 : 0, singleRepairCost);
 
   return (
     <div
@@ -85,9 +94,59 @@ export const InspectorModal: React.FC<InspectorModalProps> = ({
             </div>
           )}
 
+          {/* Structural Integrity & Repair Status */}
+          <div className={`border rounded-lg p-2 ${
+            isDamaged
+              ? isLight
+                ? 'bg-rose-50 border-rose-200 text-rose-900'
+                : 'bg-rose-950/40 border-rose-800/60 text-rose-200'
+              : isLight
+              ? 'bg-neutral-50 border-neutral-200'
+              : 'bg-neutral-900/60 border-neutral-800'
+          }`}>
+            <div className="flex items-center justify-between text-[10px] mb-1">
+              <span className="flex items-center gap-1 font-semibold">
+                <Shield className="w-3 h-3 text-cyan-400" />
+                <span>Structural Integrity</span>
+                {b.onFire && (
+                  <span className="flex items-center gap-0.5 text-orange-500 font-bold ml-1 animate-pulse">
+                    <Flame className="w-3 h-3" /> On Fire!
+                  </span>
+                )}
+              </span>
+              <span className="font-mono font-bold">
+                {currentHp} / {maxHp} HP
+              </span>
+            </div>
+
+            <div className="w-full h-2 bg-black/40 rounded-full overflow-hidden p-0.5 border border-black/20">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  currentHp / maxHp > 0.6
+                    ? 'bg-emerald-500'
+                    : currentHp / maxHp > 0.3
+                    ? 'bg-amber-500'
+                    : 'bg-rose-500'
+                }`}
+                style={{ width: `${Math.max(0, Math.min(100, (currentHp / maxHp) * 100))}%` }}
+              />
+            </div>
+
+            {isDamaged && onRepairBuilding && (
+              <button
+                type="button"
+                onClick={() => onRepairBuilding(cell.x, cell.z)}
+                className="mt-2 w-full py-1 bg-amber-500 hover:bg-amber-400 active:scale-95 text-black font-extrabold rounded text-[10px] transition-all cursor-pointer flex items-center justify-center gap-1 shadow-sm"
+              >
+                <Hammer className="w-3 h-3" />
+                <span>Repair Building (${singleRepairCost.toLocaleString()})</span>
+              </button>
+            )}
+          </div>
+
           {b.isAbandoned && (
             <div className="bg-rose-500/10 border border-rose-500/30 text-rose-500 rounded p-1.5 text-[10px] font-medium leading-tight">
-              ⚠️ Abandoned due to lack of utilities or jobs. Fix utilities to welcome residents back!
+              ⚠️ Abandoned due to raid attack damage or lack of utilities. Repair structure to welcome citizens back!
             </div>
           )}
 
@@ -195,6 +254,25 @@ export const InspectorModal: React.FC<InspectorModalProps> = ({
               {r.isHighwayGateway ? 'Yes · Regional Gateway' : 'Local Network'}
             </span>
           </div>
+
+          {r.type === 'toll_booth' && (
+            <div className={`grid grid-cols-2 gap-1.5 pt-1 border-t ${isLight ? 'border-neutral-200' : 'border-neutral-800'}`}>
+              <div className={`p-1.5 rounded border ${isLight ? 'bg-neutral-50 border-neutral-200' : 'bg-neutral-900/60 border-neutral-800'}`}>
+                <span className={`block text-[9px] ${isLight ? 'text-neutral-500' : 'text-neutral-400'}`}>Total Earnings</span>
+                <span className="font-mono font-bold text-xs text-emerald-500 flex items-center gap-0.5">
+                  <DollarSign className="w-3 h-3" />
+                  {r.totalEarnings || 0}
+                </span>
+              </div>
+              <div className={`p-1.5 rounded border ${isLight ? 'bg-neutral-50 border-neutral-200' : 'bg-neutral-900/60 border-neutral-800'}`}>
+                <span className={`block text-[9px] ${isLight ? 'text-neutral-500' : 'text-neutral-400'}`}>Vehicles Passed</span>
+                <span className="font-mono font-bold text-xs text-sky-500 flex items-center gap-1">
+                  <Users className="w-3 h-3" />
+                  {r.carsPassed || 0}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

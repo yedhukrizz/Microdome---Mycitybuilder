@@ -19,6 +19,8 @@ import { MilestoneCelebration } from './components/MilestoneCelebration';
 import { TouchControls } from './components/TouchControls';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { HomeScreen } from './components/HomeScreen';
+import { DefenseOverlay } from './components/DefenseOverlay';
+import { DefenseModal } from './components/DefenseModal';
 import {
   ActiveTool,
   CellData,
@@ -28,6 +30,7 @@ import {
   CityStats,
   Milestone,
   OverlayMode,
+  DefenseStatus,
 } from './types/city';
 
 function MainGame() {
@@ -87,6 +90,10 @@ function MainGame() {
     needsJobs: 100,
     needsTaxSatisfaction: 100,
     needsEnvironment: 100,
+    wasteGenerated: 0,
+    wasteProcessed: 0,
+    wasteCoverage: 100,
+    needsWaste: 100,
   });
 
   const [budget, setBudget] = useState<CityBudget>({
@@ -120,6 +127,7 @@ function MainGame() {
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [celebratingMilestone, setCelebratingMilestone] = useState<Milestone | null>(null);
+  const [defenseStatus, setDefenseStatus] = useState<DefenseStatus | null>(null);
   
   const [viewMode, setViewMode] = useState<'home' | 'game'>('home');
   const [threeSceneCrashed, setThreeSceneCrashed] = useState<boolean>(false);
@@ -265,6 +273,22 @@ function MainGame() {
       setChirps((prev) => [newChirp, ...prev.slice(0, 15)]);
     };
 
+    city.onWaveEvent = (event, details) => {
+      if (event === 'warning') {
+        soundEngine.playAlert();
+        setToastMessage(`⚠️ RADAR ALERT: Raider Wave ${details.waveNumber} approaching from Highway in ${details.countdown}s!`);
+      } else if (event === 'start') {
+        soundEngine.playSiren();
+        setToastMessage(`🚨 CITY LOCKDOWN: Raider Wave ${details.waveNumber} breached highway entrance! Defend the city!`);
+      } else if (event === 'victory') {
+        soundEngine.playVictory();
+        setToastMessage(`🛡️ VICTORY! Wave ${details.waveNumber} repelled! Earned +$${details.reward.toLocaleString()} bounty.`);
+      } else if (event === 'surrender') {
+        soundEngine.playAlert();
+        setToastMessage(`🏳️ Surrendered wave ${details.waveNumber}. Paid $${details.penalty.toLocaleString()} indemnity.`);
+      }
+    };
+
     // Handle clicks or touch taps on 3D grid
     scene.onCellClicked = (x: number, z: number) => {
       handleTileAction(x, z);
@@ -282,6 +306,7 @@ function MainGame() {
       setStats({ ...city.stats });
       setBudget({ ...city.budget });
       setDemands({ ...city.demands });
+      setDefenseStatus(city.getDefenseStatus());
 
       if (inspectedCell) {
         const fresh = city.getCell(inspectedCell.x, inspectedCell.z);
@@ -328,9 +353,18 @@ function MainGame() {
     }
   }, [buildPlacementMode]);
 
-  // Update cursor hover color based on tool
+  // Update cursor hover color and footprint size based on tool
   useEffect(() => {
     if (!threeSceneRef.current) return;
+    const toolSize = activeTool.size || (
+      activeTool.category === 'buildings'
+        ? (activeTool.buildingType === 'tech_megaplex_4x4' ? 4 : activeTool.buildingType.includes('2x2') ? 2 : 1)
+        : activeTool.category === 'services' && (activeTool.serviceType === 'stadium' || activeTool.serviceType === 'grand_park' || activeTool.serviceType === 'university')
+        ? 2
+        : 1
+    );
+    threeSceneRef.current.setToolSize(toolSize as (1 | 2 | 4));
+
     if (activeTool.category === 'bulldoze') {
       threeSceneRef.current.setHoverColor(0xef4444);
     } else if (activeTool.category === 'inspect' || !isBuildMode) {
@@ -486,6 +520,66 @@ function MainGame() {
     const newMuted = !isMuted;
     setIsMuted(newMuted);
     soundEngine.setMuted(newMuted);
+  };
+
+  const handleSurrenderWave = () => {
+    if (cityManagerRef.current) {
+      cityManagerRef.current.surrenderWave();
+      setDefenseStatus(cityManagerRef.current.getDefenseStatus());
+      setBudget({ ...cityManagerRef.current.budget });
+      soundEngine.playAlert();
+      showToast('🏳️ Surrendered to raiders. Indemnity paid from city treasury.');
+    }
+  };
+
+  const handleTriggerEarlyWave = () => {
+    if (cityManagerRef.current) {
+      cityManagerRef.current.triggerWaveNow();
+      setDefenseStatus(cityManagerRef.current.getDefenseStatus());
+      soundEngine.playSiren();
+      showToast('🚨 Wave triggered immediately! City defense in lockdown!');
+    }
+  };
+
+  const handleSelectDefenseTool = (toolType: 'defense_tower' | 'army_barracks' | 'toll_booth') => {
+    if (toolType === 'toll_booth') {
+      setActiveTool({ category: 'roads', roadType: 'toll_booth' });
+    } else {
+      setActiveTool({ category: 'services', serviceType: toolType });
+    }
+    setIsBuildMode(true);
+    soundEngine.playSelect();
+    showToast(
+      toolType === 'defense_tower'
+        ? '🎯 Defense Turret selected: Place along highway or roads to shoot incoming raiders!'
+        : toolType === 'army_barracks'
+        ? '🛡️ Army Barracks selected: Deploys tactical militia patrols to intercept hostiles!'
+        : '🚧 Toll Booth selected: Place on roads to collect toll revenue and barricade raiders!'
+    );
+  };
+
+  const handleRepairAllDamagedBuildings = () => {
+    if (!cityManagerRef.current) return;
+    const res = cityManagerRef.current.repairAllDamagedBuildings();
+    setBudget({ ...cityManagerRef.current.budget });
+    setStats({ ...cityManagerRef.current.stats });
+    setDefenseStatus(cityManagerRef.current.getDefenseStatus());
+    if (inspectedCell) {
+      const fresh = cityManagerRef.current.getCell(inspectedCell.x, inspectedCell.z);
+      if (fresh) setInspectedCell({ ...fresh });
+    }
+    showToast(res.message);
+  };
+
+  const handleRepairSingleBuilding = (x: number, z: number) => {
+    if (!cityManagerRef.current) return;
+    const res = cityManagerRef.current.repairSingleBuilding(x, z);
+    setBudget({ ...cityManagerRef.current.budget });
+    setStats({ ...cityManagerRef.current.stats });
+    setDefenseStatus(cityManagerRef.current.getDefenseStatus());
+    const fresh = cityManagerRef.current.getCell(x, z);
+    if (fresh) setInspectedCell({ ...fresh });
+    showToast(res.message);
   };
 
   const handleToggleDayNight = () => {
@@ -796,6 +890,7 @@ function MainGame() {
       <TopBar
         stats={stats}
         budget={budget}
+        defenseStatus={defenseStatus || undefined}
         activeModal={activeModal}
         setActiveModal={setActiveModal}
         onSpeedChange={handleSpeedChange}
@@ -876,6 +971,26 @@ function MainGame() {
             handleTileAction(x, z);
             setInspectedCell(null);
           }}
+          onRepairBuilding={handleRepairSingleBuilding}
+        />
+      )}
+
+      {/* Defense Tactical Overlay (Warning Banner, Lockdown Battle HUD, Results) */}
+      {defenseStatus && (
+        <DefenseOverlay
+          status={defenseStatus}
+          treasury={budget.treasury}
+          onSurrender={handleSurrenderWave}
+          onTriggerEarlyWave={handleTriggerEarlyWave}
+          onSelectDefenseTool={handleSelectDefenseTool}
+          onRepairAll={handleRepairAllDamagedBuildings}
+          onCloseResultBanner={() => {
+            if (cityManagerRef.current) {
+              cityManagerRef.current.lastWaveResult = null;
+              setDefenseStatus(cityManagerRef.current.getDefenseStatus());
+            }
+          }}
+          isLight={isLight}
         />
       )}
 
@@ -947,6 +1062,22 @@ function MainGame() {
           onToggleMute={handleToggleMute}
           onToggleDayNight={handleToggleDayNight}
           dayTime={stats.dayTime}
+        />
+      )}
+
+      {activeModal === 'defense' && defenseStatus && (
+        <DefenseModal
+          status={defenseStatus}
+          treasury={budget.treasury}
+          onClose={() => setActiveModal(null)}
+          onSurrender={handleSurrenderWave}
+          onTriggerEarlyWave={handleTriggerEarlyWave}
+          onRepairAll={handleRepairAllDamagedBuildings}
+          onSelectDefenseTool={(tool) => {
+            handleSelectDefenseTool(tool);
+            setActiveModal(null);
+          }}
+          isLight={isLight}
         />
       )}
 

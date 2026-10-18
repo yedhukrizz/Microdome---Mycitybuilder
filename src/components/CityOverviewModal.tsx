@@ -738,6 +738,68 @@ export const CityOverviewModal: React.FC<CityOverviewModalProps> = ({
                   </span>
                 </div>
               </div>
+
+              {/* Waste Management & Fire Protection Grid Card */}
+              <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4 space-y-3 mt-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                      <Factory className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-white text-xs">Municipal Waste Management & Fire Department</div>
+                      <span className="text-[10px] text-slate-400">Recycling, Incinerators & Fire Station Emergency Units</span>
+                    </div>
+                  </div>
+                  <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-md border ${
+                    (stats.wasteCoverage || 100) >= 80
+                      ? 'bg-emerald-950/60 text-emerald-300 border-emerald-700/60'
+                      : 'bg-amber-950/60 text-amber-300 border-amber-700/60'
+                  }`}>
+                    {(stats.wasteCoverage || 100) >= 80 ? 'CLEAN SANITATION' : 'WASTE BACKLOG'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                  {/* Waste Management Card */}
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-slate-400">Waste Processed vs Generated</span>
+                      <span className="font-mono font-bold text-white">
+                        {stats.wasteProcessed || 0} / {stats.wasteGenerated || 0} tons ({stats.wasteCoverage || 100}%)
+                      </span>
+                    </div>
+                    <div className="w-full h-3 bg-slate-950 border border-slate-800 rounded-lg p-0.5 overflow-hidden flex items-center">
+                      <div
+                        className="h-full rounded bg-emerald-400 transition-all duration-500"
+                        style={{ width: `${Math.min(100, stats.wasteCoverage || 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-400 block">
+                      Build Recycling Centers (+300 cap) and Incinerators (+750 cap) to process garbage and prevent pollution.
+                    </span>
+                  </div>
+
+                  {/* Fire Protection Card */}
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-slate-400">Fire Safety & Emergency Response</span>
+                      <span className="font-mono font-bold text-emerald-400">
+                        {stats.needsSafety}% Safety Index
+                      </span>
+                    </div>
+                    <div className="w-full h-3 bg-slate-950 border border-slate-800 rounded-lg p-0.5 overflow-hidden flex items-center">
+                      <div
+                        className="h-full rounded bg-rose-500 transition-all duration-500"
+                        style={{ width: `${Math.min(100, stats.needsSafety)}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-400 block">
+                      Fire Stations automatically dispatch fire engines to extinguish building fires and safeguard city structures.
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
